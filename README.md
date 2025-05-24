@@ -1,46 +1,157 @@
-# Getting Started with Create React App
+# STAKON Task Management System
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+## Overview
+STAKON is a comprehensive task management system designed for construction teams. It provides a robust platform for managing tasks, projects, team members, and generating reports. The application is built with React, TypeScript, Material-UI, and Firebase, offering a modern and responsive user interface with real-time data synchronization.
 
-## Available Scripts
+## Features
 
-In the project directory, you can run:
+### Authentication
+- Email/password login
+- Password recovery
+- User registration (admin only)
+- Automatic logout after 30 days of inactivity
 
-### `npm start`
+### User Management
+- User roles (Administrator, Employee)
+- User profiles with avatars, personal information, and settings
+- Working hours and timezone settings
+- Notification preferences
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+### Task Management
+- Create and edit tasks with detailed information
+- Task priorities (Critical, High, Medium, Low)
+- Task statuses (New, In Progress, Under Review, Done, Cancelled)
+- File attachments
+- Comments and mentions
+- History tracking
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+### Task Views
+- Kanban board with drag & drop
+- List view with sorting and filtering
+- Calendar view
 
-### `npm test`
+### Project Management
+- Project creation and management
+- Project statistics
+- Team assignment
+- Archiving completed projects
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+### Analytics and Reports
+- Dashboard with key metrics
+- Employee performance reports
+- Project progress reports
+- Team workload visualization
+- Export to CSV/Excel/PDF
 
-### `npm run build`
+### Other Features
+- Czech language interface
+- Light and dark themes
+- Responsive design for all devices
+- Real-time notifications
+- Global search
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+## Technology Stack
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+### Frontend
+- React 18 with TypeScript
+- Material-UI (MUI) 5+
+- React Query for data caching
+- React Hook Form for form handling
+- React Router for navigation
+- React-i18next for localization
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+### Backend (Firebase)
+- Firestore Database
+- Firebase Authentication
+- Firebase Storage
+- Firebase Functions
+- Firebase Hosting
 
-### `npm run eject`
+### Deployment
+- GitHub Actions for CI/CD
+- Automatic deployment from main branch
+- Preview channels for testing
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+## Getting Started
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+### Prerequisites
+- Node.js (v14 or higher)
+- npm or yarn
+- Firebase account
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+### Installation
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+1. Clone the repository
+```bash
+git clone <repository-url>
+cd stakon-managers
+```
 
-## Learn More
+2. Install dependencies
+```bash
+npm install
+```
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+3. Configure Firebase
+   - Create a Firebase project at [Firebase Console](https://console.firebase.google.com/)
+   - Enable Authentication, Firestore, Storage, and Functions
+   - Update the `.env` file with your Firebase configuration
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+4. Start the development server
+```bash
+npm start
+```
+
+### Firebase Setup
+1. Install Firebase CLI
+```bash
+npm install -g firebase-tools
+```
+
+2. Login to Firebase
+```bash
+firebase login
+```
+
+3. Initialize Firebase in your project
+```bash
+firebase init
+```
+
+4. Deploy to Firebase
+```bash
+npm run build
+firebase deploy
+```
+
+## Project Structure
+
+```
+src/
+├── assets/           # Static assets like images
+├── components/       # Reusable UI components
+│   ├── auth/         # Authentication components
+│   ├── common/       # Common UI components
+│   ├── dashboard/    # Dashboard components
+│   ├── layout/       # Layout components (header, sidebar)
+│   ├── projects/     # Project-related components
+│   ├── reports/      # Report components
+│   ├── tasks/        # Task-related components
+│   └── team/         # Team management components
+├── context/          # React context providers
+├── firebase/         # Firebase configuration and services
+├── hooks/            # Custom React hooks
+├── i18n/             # Internationalization
+│   └── locales/      # Translation files
+├── pages/            # Main application pages
+├── services/         # API and service functions
+├── theme/            # Theme configuration
+├── types/            # TypeScript type definitions
+└── utils/            # Utility functions
+```
+
+## License
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Contact
+For any questions or support, please contact [your-email@example.com](mailto:your-email@example.com).

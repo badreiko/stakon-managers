@@ -1,0 +1,191 @@
+{
+  "common": {
+    "save": "Uložit",
+    "cancel": "Zrušit",
+    "delete": "Smazat",
+    "edit": "Upravit",
+    "create": "Vytvořit",
+    "search": "Hledat",
+    "filter": "Filtrovat",
+    "loading": "Načítání...",
+    "noData": "Žádná data",
+    "error": "Chyba",
+    "success": "Úspěch"
+  },
+  "navigation": {
+    "dashboard": "Přehled",
+    "tasks": "Úkoly",
+    "projects": "Projekty",
+    "team": "Tým",
+    "reports": "Přehledy",
+    "settings": "Nastavení"
+  },
+  "auth": {
+    "login": "Přihlášení",
+    "logout": "Odhlásit se",
+    "email": "Email",
+    "password": "Heslo",
+    "forgotPassword": "Zapomenuté heslo",
+    "resetPassword": "Obnovit heslo",
+    "signIn": "Přihlásit se",
+    "signOut": "Odhlásit se",
+    "register": "Registrovat",
+    "emailRequired": "Email je povinný",
+    "passwordRequired": "Heslo je povinné",
+    "invalidEmail": "Neplatný email",
+    "invalidPassword": "Neplatné heslo",
+    "passwordReset": "Instrukce k obnovení hesla byly odeslány na váš email"
+  },
+  "tasks": {
+    "title": "Úkoly",
+    "newTask": "Nový úkol",
+    "taskName": "Název úkolu",
+    "description": "Popis",
+    "assignee": "Řešitel",
+    "priority": "Priorita",
+    "status": "Status",
+    "project": "Projekt",
+    "deadline": "Termín",
+    "estimatedTime": "Odhadovaný čas",
+    "tags": "Štítky",
+    "attachments": "Připojené soubory",
+    "comments": "Komentáře",
+    "addComment": "Přidat komentář",
+    "noComments": "Žádné komentáře",
+    "priorities": {
+      "critical": "Kritická",
+      "high": "Vysoká",
+      "medium": "Střední",
+      "low": "Nízká"
+    },
+    "statuses": {
+      "new": "Nový",
+      "inProgress": "Probíhá",
+      "review": "Na kontrole",
+      "done": "Hotovo",
+      "cancelled": "Zrušeno"
+    },
+    "kanban": {
+      "title": "Kanban deska",
+      "new": "K vyřízení",
+      "inProgress": "Probíhá",
+      "review": "Na kontrole",
+      "done": "Hotovo",
+      "cancelled": "Zrušeno"
+    },
+    "list": {
+      "title": "Seznam úkolů",
+      "bulkActions": "Hromadné akce",
+      "changeStatus": "Změnit status",
+      "assign": "Přiřadit",
+      "export": "Export"
+    },
+    "details": {
+      "title": "Detail úkolu",
+      "basicInfo": "Základní informace",
+      "planning": "Plánování",
+      "additional": "Doplňující informace",
+      "progress": "Průběh",
+      "actualTime": "Skutečný čas",
+      "createdBy": "Vytvořil",
+      "createdAt": "Vytvořeno",
+      "updatedAt": "Aktualizováno",
+      "history": "Historie změn"
+    },
+    "validation": {
+      "nameRequired": "Název úkolu je povinný",
+      "assigneeRequired": "Řešitel je povinný",
+      "statusRequired": "Status je povinný",
+      "projectRequired": "Projekt je povinný",
+      "deadlineRequired": "Termín je povinný",
+      "estimatedTimeRequired": "Odhadovaný čas je povinný"
+    }
+  },
+  "projects": {
+    "title": "Projekty",
+    "newProject": "Nový projekt",
+    "projectName": "Název projektu",
+    "description": "Popis",
+    "manager": "Zodpovědná osoba",
+    "deadline": "Termín",
+    "status": "Status",
+    "tasks": "Úkoly",
+    "members": "Členové",
+    "statistics": "Statistika",
+    "archive": "Archivovat",
+    "statuses": {
+      "active": "Aktivní",
+      "completed": "Dokončený",
+      "onHold": "Pozastavený",
+      "cancelled": "Zrušený",
+      "archived": "Archivovaný"
+    }
+  },
+  "team": {
+    "title": "Tým",
+    "newMember": "Nový člen",
+    "name": "Jméno",
+    "email": "Email",
+    "position": "Pozice",
+    "role": "Role",
+    "workingHours": "Pracovní doba",
+    "timezone": "Časové pásmo",
+    "tasks": "Úkoly",
+    "performance": "Výkon",
+    "roles": {
+      "admin": "Administrátor",
+      "employee": "Zaměstnanec"
+    }
+  },
+  "dashboard": {
+    "title": "Přehled",
+    "activeTasks": "Aktivní úkoly",
+    "overdueTasks": "Po termínu",
+    "todayTasks": "Dnešní úkoly",
+    "completedThisWeek": "Dokončeno tento týden",
+    "tasksByStatus": "Úkoly podle statusu",
+    "tasksByPriority": "Úkoly podle priority",
+    "tasksByAssignee": "Úkoly podle řešitele",
+    "upcomingDeadlines": "Nadcházející termíny",
+    "recentActivity": "Nedávná aktivita"
+  },
+  "reports": {
+    "title": "Přehledy",
+    "employeeReport": "Přehled zaměstnance",
+    "projectReport": "Přehled projektu",
+    "teamReport": "Přehled týmu",
+    "period": "Období",
+    "from": "Od",
+    "to": "Do",
+    "generate": "Vygenerovat",
+    "export": "Export",
+    "taskCompletion": "Dokončení úkolů",
+    "timeSpent": "Strávený čas",
+    "efficiency": "Efektivita",
+    "workload": "Vytížení"
+  },
+  "settings": {
+    "title": "Nastavení",
+    "profile": "Profil",
+    "account": "Účet",
+    "notifications": "Oznámení",
+    "appearance": "Vzhled",
+    "language": "Jazyk",
+    "theme": {
+      "title": "Téma",
+      "light": "Světlé",
+      "dark": "Tmavé",
+      "system": "Podle systému"
+    },
+    "notificationSettings": {
+      "newTask": "Nový úkol",
+      "statusChange": "Změna statusu",
+      "deadlineApproaching": "Blížící se termín",
+      "comments": "Komentáře",
+      "mentions": "Zmínky",
+      "email": "Email",
+      "inApp": "V aplikaci",
+      "push": "Push"
+    }
+  }
+}

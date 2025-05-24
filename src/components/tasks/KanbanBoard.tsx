@@ -1,0 +1,549 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  Box, 
+  Typography, 
+  Paper, 
+  Chip, 
+  Avatar, 
+  Card, 
+  CardContent, 
+  IconButton,
+  Menu,
+  MenuItem,
+  Tooltip,
+  Badge,
+  Grid,
+  FormControl,
+  InputLabel,
+  Select,
+  OutlinedInput,
+  Button,
+  CircularProgress,
+  SelectChangeEvent
+} from '@mui/material';
+import { 
+  MoreVert as MoreVertIcon,
+  CalendarToday as CalendarIcon,
+  Comment as CommentIcon,
+  Attachment as AttachmentIcon,
+  Add as AddIcon,
+  FilterList as FilterListIcon
+} from '@mui/icons-material';
+import { DragDropContext, Droppable, Draggable, DropResult, DroppableProvided, DraggableProvided, DroppableStateSnapshot, DraggableStateSnapshot } from 'react-beautiful-dnd';
+import { useTranslation } from 'react-i18next';
+import { format } from 'date-fns';
+import { cs } from 'date-fns/locale';
+import { useAuth } from '../../context/AuthContext';
+import { Task, TaskStatus } from '../../types/task.types';
+import { User } from '../../types/user.types';
+import { Project } from '../../types/project.types';
+import { getTasks, updateTaskStatus } from '../../services/taskService';
+import { getUsers } from '../../services/userService';
+import { getActiveProjects } from '../../services/projectService';
+import TaskForm from './TaskForm';
+import { STATUS_COLORS, PRIORITY_COLORS } from '../../theme/theme';
+
+// Define the columns for the Kanban board
+const columns: { id: TaskStatus; title: string; color: string }[] = [
+  { id: 'new', title: 'tasks.kanban.new', color: STATUS_COLORS.new },
+  { id: 'inProgress', title: 'tasks.kanban.inProgress', color: STATUS_COLORS.inProgress },
+  { id: 'review', title: 'tasks.kanban.review', color: STATUS_COLORS.review },
+  { id: 'done', title: 'tasks.kanban.done', color: STATUS_COLORS.done },
+  { id: 'cancelled', title: 'tasks.kanban.cancelled', color: STATUS_COLORS.cancelled }
+];
+
+// Get priority color
+const getPriorityColor = (priority: string) => {
+  switch (priority) {
+    case 'critical':
+      return PRIORITY_COLORS.critical;
+    case 'high':
+      return PRIORITY_COLORS.high;
+    case 'medium':
+      return PRIORITY_COLORS.medium;
+    case 'low':
+      return PRIORITY_COLORS.low;
+    default:
+      return PRIORITY_COLORS.medium;
+  }
+};
+
+const KanbanBoard: React.FC = () => {
+  const { t } = useTranslation();
+  const { currentUser } = useAuth();
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [taskFormOpen, setTaskFormOpen] = useState(false);
+  const [filterMenuOpen, setFilterMenuOpen] = useState(false);
+  const [filters, setFilters] = useState({
+    assignee: '',
+    project: '',
+    tags: [] as string[]
+  });
+
+  // Fetch tasks, users, and projects
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const { tasks: fetchedTasks } = await getTasks();
+        const fetchedUsers = await getUsers();
+        const fetchedProjects = await getActiveProjects();
+        
+        setTasks(fetchedTasks);
+        setUsers(fetchedUsers);
+        setProjects(fetchedProjects);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  // Group tasks by status
+  const groupedTasks = columns.reduce((acc, column) => {
+    acc[column.id] = tasks
+      .filter(task => task.status === column.id)
+      .filter(task => {
+        // Apply filters
+        if (filters.assignee && task.assignee !== filters.assignee) return false;
+        if (filters.project && task.project !== filters.project) return false;
+        if (filters.tags.length > 0 && !filters.tags.some(tag => task.tags.includes(tag))) return false;
+        return true;
+      });
+    return acc;
+  }, {} as Record<TaskStatus, Task[]>);
+
+  // Handle task menu open
+  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, task: Task) => {
+    event.stopPropagation();
+    setMenuAnchorEl(event.currentTarget);
+    setSelectedTask(task);
+  };
+
+  // Handle task menu close
+  const handleMenuClose = () => {
+    setMenuAnchorEl(null);
+    setSelectedTask(null);
+  };
+
+  // Handle edit task
+  const handleEditTask = () => {
+    setTaskFormOpen(true);
+    handleMenuClose();
+  };
+
+  // Handle task form close
+  const handleTaskFormClose = () => {
+    setTaskFormOpen(false);
+    setSelectedTask(null);
+  };
+
+  // Handle task form success
+  const handleTaskFormSuccess = () => {
+    // Refresh tasks
+    const fetchTasks = async () => {
+      try {
+        const { tasks: fetchedTasks } = await getTasks();
+        setTasks(fetchedTasks);
+      } catch (error) {
+        console.error('Error fetching tasks:', error);
+      }
+    };
+
+    fetchTasks();
+  };
+
+  // Handle drag and drop
+  const handleDragEnd = async (result: DropResult) => {
+    const { destination, source, draggableId } = result;
+
+    // If there's no destination or the item is dropped in the same place
+    if (!destination || 
+        (destination.droppableId === source.droppableId && 
+         destination.index === source.index)) {
+      return;
+    }
+
+    // Find the task that was dragged
+    const task = tasks.find(t => t.id === draggableId);
+    if (!task || !currentUser) return;
+
+    // Update the task status
+    const newStatus = destination.droppableId as TaskStatus;
+    
+    // Optimistically update the UI
+    const updatedTasks = tasks.map(t => 
+      t.id === draggableId ? { ...t, status: newStatus } : t
+    );
+    setTasks(updatedTasks);
+
+    try {
+      // Update the task in the database
+      await updateTaskStatus(draggableId, newStatus, currentUser.uid);
+    } catch (error) {
+      console.error('Error updating task status:', error);
+      // Revert the UI if there's an error
+      setTasks(tasks);
+    }
+  };
+
+  // Handle filter change
+  const handleFilterChange = (
+    event: React.ChangeEvent<{ name?: string; value: unknown }>
+  ) => {
+    const { name, value } = event.target;
+    if (name) {
+      setFilters(prev => ({ ...prev, [name]: value }));
+    }
+  };
+
+  // Handle filter reset
+  const handleFilterReset = () => {
+    setFilters({
+      assignee: '',
+      project: '',
+      tags: []
+    });
+  };
+
+  // Get user by ID
+  const getUserById = (userId: string) => {
+    return users.find(user => user.uid === userId);
+  };
+
+  // Get project by ID
+  const getProjectById = (projectId: string) => {
+    return projects.find(project => project.id === projectId);
+  };
+
+  // Get all unique tags from tasks
+  const allTags = Array.from(new Set(tasks.flatMap(task => task.tags)));
+
+  return (
+    <Box sx={{ height: '100%' }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Typography variant="h4" component="h1">
+          {t('tasks.kanban.title')}
+        </Typography>
+        
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <Button
+            variant="outlined"
+            startIcon={<FilterListIcon />}
+            onClick={() => setFilterMenuOpen(!filterMenuOpen)}
+          >
+            {t('common.filter')}
+          </Button>
+          
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<AddIcon />}
+            onClick={() => {
+              setSelectedTask(null);
+              setTaskFormOpen(true);
+            }}
+          >
+            {t('tasks.newTask')}
+          </Button>
+        </Box>
+      </Box>
+      
+      {filterMenuOpen && (
+        <Paper sx={{ p: 2, mb: 3 }}>
+          <Typography variant="h6" gutterBottom>
+            {t('common.filter')}
+          </Typography>
+          
+          <Grid container spacing={2} alignItems="center">
+            <Grid item xs={12} sm={4}>
+              <FormControl fullWidth size="small">
+                <InputLabel id="assignee-filter-label">{t('tasks.assignee')}</InputLabel>
+                <Select
+                  labelId="assignee-filter-label"
+                  name="assignee"
+                  value={filters.assignee}
+                  onChange={handleFilterChange}
+                  input={<OutlinedInput label={t('tasks.assignee')} />}
+                >
+                  <MenuItem value="">
+                    <em>{t('common.all')}</em>
+                  </MenuItem>
+                  {users.map((user) => (
+                    <MenuItem key={user.uid} value={user.uid}>
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        {user.photoURL ? (
+                          <Avatar src={user.photoURL} alt={user.displayName} sx={{ width: 24, height: 24, mr: 1 }} />
+                        ) : (
+                          <Avatar sx={{ width: 24, height: 24, mr: 1 }}>
+                            {user.displayName.charAt(0)}
+                          </Avatar>
+                        )}
+                        {user.displayName}
+                      </Box>
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            
+            <Grid item xs={12} sm={4}>
+              <FormControl fullWidth size="small">
+                <InputLabel id="project-filter-label">{t('tasks.project')}</InputLabel>
+                <Select
+                  labelId="project-filter-label"
+                  name="project"
+                  value={filters.project}
+                  onChange={handleFilterChange}
+                  input={<OutlinedInput label={t('tasks.project')} />}
+                >
+                  <MenuItem value="">
+                    <em>{t('common.all')}</em>
+                  </MenuItem>
+                  {projects.map((project) => (
+                    <MenuItem key={project.id} value={project.id}>
+                      {project.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            
+            <Grid item xs={12} sm={4}>
+              <FormControl fullWidth size="small">
+                <InputLabel id="tags-filter-label">{t('tasks.tags')}</InputLabel>
+                <Select
+                  labelId="tags-filter-label"
+                  name="tags"
+                  multiple
+                  value={filters.tags}
+                  onChange={handleFilterChange}
+                  input={<OutlinedInput label={t('tasks.tags')} />}
+                  renderValue={(selected: unknown) => (
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                      {(selected as string[]).map((value) => (
+                        <Chip key={value} label={value} size="small" />
+                      ))}
+                    </Box>
+                  )}
+                >
+                  {allTags.map((tag) => (
+                    <MenuItem key={tag} value={tag}>
+                      {tag}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            
+            <Grid item xs={12} sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <Button onClick={handleFilterReset}>
+                {t('common.reset')}
+              </Button>
+            </Grid>
+          </Grid>
+        </Paper>
+      )}
+      
+      {loading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 400 }}>
+          <CircularProgress />
+        </Box>
+      ) : (
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: `repeat(${columns.length}, 1fr)`,
+              gap: 2,
+              height: 'calc(100vh - 200px)',
+              overflowX: 'auto',
+              pb: 2
+            }}
+          >
+            {columns.map((column) => (
+              <Droppable key={column.id} droppableId={column.id}>
+                {(provided: DroppableProvided, snapshot: DroppableStateSnapshot) => (
+                  <Paper
+                    ref={provided.innerRef}
+                    {...provided.droppableProps}
+                    sx={{
+                      bgcolor: column.color,
+                      p: 2,
+                      height: '100%',
+                      overflowY: 'auto',
+                      transition: 'background-color 0.2s ease',
+                      ...(snapshot.isDraggingOver && {
+                        bgcolor: `${column.color}80` // Add transparency when dragging over
+                      })
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                      <Typography variant="h6" fontWeight="bold">
+                        {t(column.title)}
+                      </Typography>
+                      <Chip 
+                        label={groupedTasks[column.id].length} 
+                        size="small" 
+                        sx={{ bgcolor: 'white' }} 
+                      />
+                    </Box>
+                    
+                    {groupedTasks[column.id].map((task, index) => (
+                      <Draggable key={task.id} draggableId={task.id} index={index}>
+                        {(provided: DraggableProvided, snapshot: DraggableStateSnapshot) => (
+                          <Card
+                            ref={provided.innerRef}
+                            {...provided.draggableProps}
+                            {...provided.dragHandleProps}
+                            sx={{
+                              mb: 2,
+                              borderLeft: 4,
+                              borderColor: getPriorityColor(task.priority),
+                              boxShadow: snapshot.isDragging ? 8 : 1,
+                              '&:hover': {
+                                boxShadow: 3
+                              }
+                            }}
+                            onClick={() => {
+                              setSelectedTask(task);
+                              setTaskFormOpen(true);
+                            }}
+                          >
+                            <CardContent sx={{ pb: 1, '&:last-child': { pb: 1 } }}>
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                                <Chip 
+                                  label={t(`tasks.priorities.${task.priority}`)} 
+                                  size="small" 
+                                  sx={{ 
+                                    bgcolor: `${getPriorityColor(task.priority)}20`,
+                                    color: getPriorityColor(task.priority),
+                                    fontWeight: 'bold'
+                                  }} 
+                                />
+                                <IconButton 
+                                  size="small" 
+                                  onClick={(e: React.MouseEvent<HTMLElement>) => handleMenuOpen(e, task)}
+                                >
+                                  <MoreVertIcon fontSize="small" />
+                                </IconButton>
+                              </Box>
+                              
+                              <Typography variant="subtitle1" fontWeight="bold" gutterBottom noWrap>
+                                {task.title}
+                              </Typography>
+                              
+                              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                                {task.assignee && getUserById(task.assignee) && (
+                                  <Tooltip title={getUserById(task.assignee)?.displayName || ''}>
+                                    <Avatar 
+                                      src={getUserById(task.assignee)?.photoURL} 
+                                      alt={getUserById(task.assignee)?.displayName}
+                                      sx={{ width: 24, height: 24, mr: 1 }}
+                                    >
+                                      {getUserById(task.assignee)?.displayName.charAt(0)}
+                                    </Avatar>
+                                  </Tooltip>
+                                )}
+                                
+                                <Typography variant="body2" color="text.secondary" noWrap>
+                                  {task.project && getProjectById(task.project)?.name}
+                                </Typography>
+                              </Box>
+                              
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                  <Tooltip title={t('tasks.deadline')}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', mr: 1 }}>
+                                      <CalendarIcon fontSize="small" color="action" sx={{ mr: 0.5 }} />
+                                      <Typography variant="caption">
+                                        {format(new Date(task.deadline), 'dd.MM.yyyy')}
+                                      </Typography>
+                                    </Box>
+                                  </Tooltip>
+                                </Box>
+                                
+                                <Box sx={{ display: 'flex' }}>
+                                  {task.comments.length > 0 && (
+                                    <Badge badgeContent={task.comments.length} color="primary" sx={{ mr: 1 }}>
+                                      <CommentIcon fontSize="small" color="action" />
+                                    </Badge>
+                                  )}
+                                  
+                                  {task.attachments.length > 0 && (
+                                    <Badge badgeContent={task.attachments.length} color="secondary">
+                                      <AttachmentIcon fontSize="small" color="action" />
+                                    </Badge>
+                                  )}
+                                </Box>
+                              </Box>
+                              
+                              {task.tags.length > 0 && (
+                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 1 }}>
+                                  {task.tags.slice(0, 3).map((tag) => (
+                                    <Chip 
+                                      key={tag} 
+                                      label={tag} 
+                                      size="small" 
+                                      sx={{ height: 20, fontSize: '0.7rem' }} 
+                                    />
+                                  ))}
+                                  {task.tags.length > 3 && (
+                                    <Chip 
+                                      label={`+${task.tags.length - 3}`} 
+                                      size="small" 
+                                      sx={{ height: 20, fontSize: '0.7rem' }} 
+                                    />
+                                  )}
+                                </Box>
+                              )}
+                            </CardContent>
+                          </Card>
+                        )}
+                      </Draggable>
+                    ))}
+                    {provided.placeholder}
+                  </Paper>
+                )}
+              </Droppable>
+            ))}
+          </Box>
+        </DragDropContext>
+      )}
+      
+      {/* Task menu */}
+      <Menu
+        anchorEl={menuAnchorEl}
+        open={Boolean(menuAnchorEl)}
+        onClose={handleMenuClose}
+      >
+        <MenuItem onClick={handleEditTask}>
+          {t('common.edit')}
+        </MenuItem>
+        <MenuItem onClick={handleMenuClose}>
+          {t('common.delete')}
+        </MenuItem>
+      </Menu>
+      
+      {/* Task form dialog */}
+      {taskFormOpen && (
+        <TaskForm
+          task={selectedTask || undefined}
+          open={taskFormOpen}
+          onClose={handleTaskFormClose}
+          onSuccess={handleTaskFormSuccess}
+        />
+      )}
+    </Box>
+  );
+};
+
+export default KanbanBoard;
