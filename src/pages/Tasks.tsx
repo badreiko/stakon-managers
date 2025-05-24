@@ -15,7 +15,7 @@ import {
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
-import KanbanBoard from '../components/tasks/KanbanBoard.dndkit';
+import KanbanBoard from '../components/tasks/KanbanBoard';
 import TaskList from '../components/tasks/TaskList';
 import TaskDetail from '../components/tasks/TaskDetail';
 
