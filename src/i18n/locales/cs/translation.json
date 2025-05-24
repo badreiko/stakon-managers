@@ -10,7 +10,32 @@
     "loading": "Načítání...",
     "noData": "Žádná data",
     "error": "Chyba",
-    "success": "Úspěch"
+    "success": "Úspěch",
+    "all": "Vše",
+    "reset": "Resetovat",
+    "resetFilters": "Resetovat filtry",
+    "comingSoon": "Připravujeme",
+    "featureUnderDevelopment": "Funkce je ve vývoji",
+    "calendar": "Kalendář",
+    "view": "Zobrazit",
+    "unassigned": "Nepřiřazeno",
+    "noDeadline": "Bez termínu",
+    "noProject": "Bez projektu",
+    "noTags": "Žádné štítky",
+    "noComments": "Žádné komentáře",
+    "noAttachments": "Žádné přílohy",
+    "noHistory": "Žádná historie",
+    "noDescription": "Bez popisu",
+    "notFound": "Nenalezeno",
+    "backToList": "Zpět na seznam",
+    "send": "Odeslat",
+    "download": "Stáhnout",
+    "from": "Od",
+    "to": "Do",
+    "actions": "Akce",
+    "hours": "hodin",
+    "deleteConfirmation": "Opravdu chcete smazat {count} položek?",
+    "changedField": "Změnil pole {field}"
   },
   "navigation": {
     "dashboard": "Přehled",
@@ -33,12 +58,15 @@
     "emailRequired": "Email je povinný",
     "passwordRequired": "Heslo je povinné",
     "invalidEmail": "Neplatný email",
-    "invalidPassword": "Neplatné heslo",
+    "invalidPassword": "Neplatné přihlašovací údaje",
+    "tooManyRequests": "Příliš mnoho pokusů o přihlášení",
+    "userNotFound": "Uživatel nenalezen",
     "passwordReset": "Instrukce k obnovení hesla byly odeslány na váš email"
   },
   "tasks": {
     "title": "Úkoly",
     "newTask": "Nový úkol",
+    "addTask": "Přidat úkol",
     "taskName": "Název úkolu",
     "description": "Popis",
     "assignee": "Řešitel",
@@ -92,6 +120,12 @@
       "updatedAt": "Aktualizováno",
       "history": "Historie změn"
     },
+    "filters": {
+      "all": "Všechny úkoly",
+      "myTasks": "Moje úkoly",
+      "highPriority": "Vysoká priorita",
+      "dueThisWeek": "Termín tento týden"
+    },
     "validation": {
       "nameRequired": "Název úkolu je povinný",
       "assigneeRequired": "Řešitel je povinný",
@@ -104,6 +138,7 @@
   "projects": {
     "title": "Projekty",
     "newProject": "Nový projekt",
+    "edit": "Upravit projekt",
     "projectName": "Název projektu",
     "description": "Popis",
     "manager": "Zodpovědná osoba",
@@ -111,8 +146,10 @@
     "status": "Status",
     "tasks": "Úkoly",
     "members": "Členové",
-    "statistics": "Statistika",
     "archive": "Archivovat",
+    "statistics": {
+      "progress": "Průběh"
+    },
     "statuses": {
       "active": "Aktivní",
       "completed": "Dokončený",
@@ -124,14 +161,31 @@
   "team": {
     "title": "Tým",
     "newMember": "Nový člen",
+    "addMember": "Přidat člena",
+    "addUser": "Přidat uživatele",
+    "editUser": "Upravit uživatele",
     "name": "Jméno",
+    "displayName": "Zobrazované jméno",
     "email": "Email",
     "position": "Pozice",
     "role": "Role",
     "workingHours": "Pracovní doba",
+    "workingHoursStart": "Začátek pracovní doby",
+    "workingHoursEnd": "Konec pracovní doby",
     "timezone": "Časové pásmo",
+    "department": "Oddělení",
+    "phoneNumber": "Telefonní číslo",
     "tasks": "Úkoly",
     "performance": "Výkon",
+    "contact": "Kontakt",
+    "sendEmail": "Poslat email",
+    "allMembers": "Všichni členové",
+    "teamMembers": "Členové týmu",
+    "admins": "Administrátoři",
+    "employees": "Zaměstnanci",
+    "noMembers": "Žádní členové",
+    "noAdmins": "Žádní administrátoři",
+    "noEmployees": "Žádní zaměstnanci",
     "roles": {
       "admin": "Administrátor",
       "employee": "Zaměstnanec"
@@ -187,5 +241,12 @@
       "inApp": "V aplikaci",
       "push": "Push"
     }
+  },
+  "status": {
+    "new": "vytvořil nový úkol",
+    "inProgress": "začal pracovat na úkolu",
+    "review": "dal úkol na kontrolu",
+    "done": "dokončil úkol",
+    "cancelled": "zrušil úkol"
   }
 }

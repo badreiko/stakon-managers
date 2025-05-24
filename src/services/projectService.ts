@@ -33,18 +33,47 @@ const PROJECTS_COLLECTION = 'projects';
 const convertToProject = (doc: QueryDocumentSnapshot<DocumentData>): Project => {
   const data = doc.data();
   
+  // Helper function to safely convert Firestore timestamp to Date
+  const toDate = (timestamp: any): Date => {
+    if (!timestamp) return new Date();
+    if (timestamp.toDate && typeof timestamp.toDate === 'function') {
+      return timestamp.toDate();
+    }
+    if (timestamp instanceof Date) {
+      return timestamp;
+    }
+    if (typeof timestamp === 'string' || typeof timestamp === 'number') {
+      return new Date(timestamp);
+    }
+    return new Date();
+  };
+
+  const toOptionalDate = (timestamp: any): Date | undefined => {
+    if (!timestamp) return undefined;
+    if (timestamp.toDate && typeof timestamp.toDate === 'function') {
+      return timestamp.toDate();
+    }
+    if (timestamp instanceof Date) {
+      return timestamp;
+    }
+    if (typeof timestamp === 'string' || typeof timestamp === 'number') {
+      return new Date(timestamp);
+    }
+    return undefined;
+  };
+  
   return {
     id: doc.id,
-    name: data.name,
-    description: data.description,
-    status: data.status,
-    manager: data.manager,
+    name: data.name || '',
+    description: data.description || '',
+    status: data.status || 'active',
+    manager: data.manager || '',
     members: data.members || [],
-    deadline: data.deadline ? data.deadline.toDate() : undefined,
-    startDate: data.startDate.toDate(),
-    createdBy: data.createdBy,
-    createdAt: data.createdAt.toDate(),
-    updatedAt: data.updatedAt.toDate(),
+    deadline: toOptionalDate(data.deadline),
+    startDate: toDate(data.startDate),
+    createdBy: data.createdBy || '',
+    createdAt: toDate(data.createdAt),
+    updatedAt: toDate(data.updatedAt),
     tags: data.tags || [],
     statistics: data.statistics || {
       totalTasks: 0,
@@ -59,8 +88,8 @@ const convertToProject = (doc: QueryDocumentSnapshot<DocumentData>): Project => 
 // Get all projects with filtering, sorting, and pagination
 export const getProjects = async (options?: ProjectListOptions): Promise<Project[]> => {
   try {
+    console.log('Getting projects from Firestore...');
     const collectionRef = collection(db, PROJECTS_COLLECTION);
-    let q = collectionRef;
     let queryConstraints = [];
 
     // Apply filters
@@ -71,6 +100,8 @@ export const getProjects = async (options?: ProjectListOptions): Promise<Project
         if (filters.status.length === 1) {
           queryConstraints.push(where('status', '==', filters.status[0]));
         }
+        // For multiple statuses, we'd need multiple queries and combine results
+        // Firebase doesn't support OR queries directly with other conditions
       }
       
       if (filters.manager) {
@@ -100,7 +131,7 @@ export const getProjects = async (options?: ProjectListOptions): Promise<Project
       queryConstraints.push(orderBy(options.sort.field, options.sort.direction));
     } else {
       // Default sorting by updatedAt desc
-      queryConstraints.push(orderBy('updatedAt', 'desc'));
+      queryConstraints.push(orderBy('createdAt', 'desc'));
     }
     
     // Apply pagination
@@ -109,7 +140,9 @@ export const getProjects = async (options?: ProjectListOptions): Promise<Project
     }
     
     // Create the query with all constraints
-    const queryWithConstraints = query(collectionRef, ...queryConstraints);
+    const queryWithConstraints = queryConstraints.length > 0 
+      ? query(collectionRef, ...queryConstraints)
+      : query(collectionRef, orderBy('createdAt', 'desc'));
     
     // Execute the query
     const querySnapshot = await getDocs(queryWithConstraints);
@@ -118,39 +151,68 @@ export const getProjects = async (options?: ProjectListOptions): Promise<Project
     const projects: Project[] = [];
     
     querySnapshot.forEach((doc) => {
-      projects.push(convertToProject(doc));
+      try {
+        const project = convertToProject(doc);
+        projects.push(project);
+      } catch (error) {
+        console.error('Error converting project document:', doc.id, error);
+      }
     });
     
+    console.log(`Found ${projects.length} projects`);
     return projects;
   } catch (error) {
     console.error('Error getting projects:', error);
-    throw error;
+    throw new Error(`Failed to fetch projects: ${error instanceof Error ? error.message : String(error)}`);
   }
 };
 
 // Get a single project by ID
 export const getProjectById = async (projectId: string): Promise<Project | null> => {
   try {
+    console.log('Getting project by ID:', projectId);
     const projectDoc = await getDoc(doc(db, PROJECTS_COLLECTION, projectId));
     
     if (!projectDoc.exists()) {
+      console.log('Project not found:', projectId);
       return null;
     }
     
-    return convertToProject(projectDoc as QueryDocumentSnapshot<DocumentData>);
+    const project = convertToProject(projectDoc as QueryDocumentSnapshot<DocumentData>);
+    console.log('Found project:', project);
+    return project;
   } catch (error) {
     console.error('Error getting project by ID:', error);
-    throw error;
+    throw new Error(`Failed to fetch project: ${error instanceof Error ? error.message : String(error)}`);
   }
 };
 
 // Create a new project
 export const createProject = async (projectData: Omit<Project, 'id' | 'createdAt' | 'updatedAt' | 'statistics'>): Promise<Project> => {
   try {
+    console.log('Creating project with data:', projectData);
+    
+    // Validate required fields
+    if (!projectData.name || !projectData.name.trim()) {
+      throw new Error('Project name is required');
+    }
+    
+    if (!projectData.createdBy) {
+      throw new Error('Created by field is required');
+    }
+    
     const now = serverTimestamp();
     
     const newProjectData = {
-      ...projectData,
+      name: projectData.name.trim(),
+      description: projectData.description || '',
+      status: projectData.status || 'active',
+      manager: projectData.manager || '',
+      members: projectData.members || [],
+      deadline: projectData.deadline ? Timestamp.fromDate(projectData.deadline) : null,
+      startDate: projectData.startDate ? Timestamp.fromDate(projectData.startDate) : now,
+      createdBy: projectData.createdBy,
+      tags: projectData.tags || [],
       createdAt: now,
       updatedAt: now,
       statistics: {
@@ -162,19 +224,22 @@ export const createProject = async (projectData: Omit<Project, 'id' | 'createdAt
       }
     };
     
+    console.log('Saving project data to Firestore:', newProjectData);
     const docRef = await addDoc(collection(db, PROJECTS_COLLECTION), newProjectData);
     
     // Get the created project
     const projectDoc = await getDoc(docRef);
     
     if (!projectDoc.exists()) {
-      throw new Error('Failed to create project');
+      throw new Error('Failed to retrieve created project');
     }
     
-    return convertToProject(projectDoc as QueryDocumentSnapshot<DocumentData>);
+    const project = convertToProject(projectDoc as QueryDocumentSnapshot<DocumentData>);
+    console.log('Project created successfully:', project);
+    return project;
   } catch (error) {
     console.error('Error creating project:', error);
-    throw error;
+    throw new Error(`Failed to create project: ${error instanceof Error ? error.message : String(error)}`);
   }
 };
 
@@ -184,6 +249,8 @@ export const updateProject = async (
   projectData: Partial<Omit<Project, 'id' | 'createdAt' | 'updatedAt' | 'statistics'>>
 ): Promise<Project> => {
   try {
+    console.log('Updating project:', projectId, 'with data:', projectData);
+    
     const projectRef = doc(db, PROJECTS_COLLECTION, projectId);
     const projectDoc = await getDoc(projectRef);
     
@@ -191,33 +258,55 @@ export const updateProject = async (
       throw new Error('Project not found');
     }
     
-    // Update the project with new data
-    await updateDoc(projectRef, {
+    // Prepare update data
+    const updateData: any = {
       ...projectData,
       updatedAt: serverTimestamp()
-    });
+    };
+    
+    // Convert deadline to Timestamp if provided
+    if (projectData.deadline) {
+      updateData.deadline = Timestamp.fromDate(projectData.deadline);
+    } else if (projectData.deadline === undefined) {
+      // Keep existing deadline
+      delete updateData.deadline;
+    }
+    
+    // Convert startDate to Timestamp if provided
+    if (projectData.startDate) {
+      updateData.startDate = Timestamp.fromDate(projectData.startDate);
+    }
+    
+    console.log('Update data prepared:', updateData);
+    
+    // Update the project with new data
+    await updateDoc(projectRef, updateData);
     
     // Get the updated project
     const updatedProjectDoc = await getDoc(projectRef);
     
     if (!updatedProjectDoc.exists()) {
-      throw new Error('Failed to update project');
+      throw new Error('Failed to retrieve updated project');
     }
     
-    return convertToProject(updatedProjectDoc as QueryDocumentSnapshot<DocumentData>);
+    const project = convertToProject(updatedProjectDoc as QueryDocumentSnapshot<DocumentData>);
+    console.log('Project updated successfully:', project);
+    return project;
   } catch (error) {
     console.error('Error updating project:', error);
-    throw error;
+    throw new Error(`Failed to update project: ${error instanceof Error ? error.message : String(error)}`);
   }
 };
 
 // Delete a project
 export const deleteProject = async (projectId: string): Promise<void> => {
   try {
+    console.log('Deleting project:', projectId);
     await deleteDoc(doc(db, PROJECTS_COLLECTION, projectId));
+    console.log('Project deleted successfully');
   } catch (error) {
     console.error('Error deleting project:', error);
-    throw error;
+    throw new Error(`Failed to delete project: ${error instanceof Error ? error.message : String(error)}`);
   }
 };
 
@@ -227,6 +316,8 @@ export const addProjectMember = async (
   member: Omit<ProjectMember, 'joinedAt'>
 ): Promise<Project> => {
   try {
+    console.log('Adding member to project:', projectId, member);
+    
     const projectRef = doc(db, PROJECTS_COLLECTION, projectId);
     const projectDoc = await getDoc(projectRef);
     
@@ -248,13 +339,15 @@ export const addProjectMember = async (
     const updatedProjectDoc = await getDoc(projectRef);
     
     if (!updatedProjectDoc.exists()) {
-      throw new Error('Failed to update project');
+      throw new Error('Failed to retrieve updated project');
     }
     
-    return convertToProject(updatedProjectDoc as QueryDocumentSnapshot<DocumentData>);
+    const project = convertToProject(updatedProjectDoc as QueryDocumentSnapshot<DocumentData>);
+    console.log('Member added successfully');
+    return project;
   } catch (error) {
     console.error('Error adding project member:', error);
-    throw error;
+    throw new Error(`Failed to add project member: ${error instanceof Error ? error.message : String(error)}`);
   }
 };
 
@@ -264,6 +357,8 @@ export const removeProjectMember = async (
   userId: string
 ): Promise<Project> => {
   try {
+    console.log('Removing member from project:', projectId, userId);
+    
     const projectRef = doc(db, PROJECTS_COLLECTION, projectId);
     const projectDoc = await getDoc(projectRef);
     
@@ -287,13 +382,15 @@ export const removeProjectMember = async (
     const updatedProjectDoc = await getDoc(projectRef);
     
     if (!updatedProjectDoc.exists()) {
-      throw new Error('Failed to update project');
+      throw new Error('Failed to retrieve updated project');
     }
     
-    return convertToProject(updatedProjectDoc as QueryDocumentSnapshot<DocumentData>);
+    const updatedProject = convertToProject(updatedProjectDoc as QueryDocumentSnapshot<DocumentData>);
+    console.log('Member removed successfully');
+    return updatedProject;
   } catch (error) {
     console.error('Error removing project member:', error);
-    throw error;
+    throw new Error(`Failed to remove project member: ${error instanceof Error ? error.message : String(error)}`);
   }
 };
 
@@ -303,6 +400,8 @@ export const updateProjectStatistics = async (
   statistics: ProjectStatistics
 ): Promise<Project> => {
   try {
+    console.log('Updating project statistics:', projectId, statistics);
+    
     const projectRef = doc(db, PROJECTS_COLLECTION, projectId);
     const projectDoc = await getDoc(projectRef);
     
@@ -319,24 +418,33 @@ export const updateProjectStatistics = async (
     const updatedProjectDoc = await getDoc(projectRef);
     
     if (!updatedProjectDoc.exists()) {
-      throw new Error('Failed to update project');
+      throw new Error('Failed to retrieve updated project');
     }
     
-    return convertToProject(updatedProjectDoc as QueryDocumentSnapshot<DocumentData>);
+    const project = convertToProject(updatedProjectDoc as QueryDocumentSnapshot<DocumentData>);
+    console.log('Project statistics updated successfully');
+    return project;
   } catch (error) {
     console.error('Error updating project statistics:', error);
-    throw error;
+    throw new Error(`Failed to update project statistics: ${error instanceof Error ? error.message : String(error)}`);
   }
 };
 
 // Archive a project
 export const archiveProject = async (projectId: string): Promise<Project> => {
-  return updateProject(projectId, { status: 'archived' });
+  try {
+    console.log('Archiving project:', projectId);
+    return await updateProject(projectId, { status: 'archived' });
+  } catch (error) {
+    console.error('Error archiving project:', error);
+    throw new Error(`Failed to archive project: ${error instanceof Error ? error.message : String(error)}`);
+  }
 };
 
 // Get projects by manager
 export const getProjectsByManager = async (managerId: string): Promise<Project[]> => {
   try {
+    console.log('Getting projects by manager:', managerId);
     const q = query(
       collection(db, PROJECTS_COLLECTION),
       where('manager', '==', managerId),
@@ -347,19 +455,25 @@ export const getProjectsByManager = async (managerId: string): Promise<Project[]
     const projects: Project[] = [];
     
     querySnapshot.forEach((doc) => {
-      projects.push(convertToProject(doc));
+      try {
+        projects.push(convertToProject(doc));
+      } catch (error) {
+        console.error('Error converting project document:', doc.id, error);
+      }
     });
     
+    console.log(`Found ${projects.length} projects for manager ${managerId}`);
     return projects;
   } catch (error) {
     console.error('Error getting projects by manager:', error);
-    throw error;
+    throw new Error(`Failed to get projects by manager: ${error instanceof Error ? error.message : String(error)}`);
   }
 };
 
 // Get active projects
 export const getActiveProjects = async (): Promise<Project[]> => {
   try {
+    console.log('Getting active projects');
     const q = query(
       collection(db, PROJECTS_COLLECTION),
       where('status', '==', 'active'),
@@ -370,12 +484,22 @@ export const getActiveProjects = async (): Promise<Project[]> => {
     const projects: Project[] = [];
     
     querySnapshot.forEach((doc) => {
-      projects.push(convertToProject(doc));
+      try {
+        projects.push(convertToProject(doc));
+      } catch (error) {
+        console.error('Error converting project document:', doc.id, error);
+      }
     });
     
+    console.log(`Found ${projects.length} active projects`);
     return projects;
   } catch (error) {
     console.error('Error getting active projects:', error);
-    throw error;
+    throw new Error(`Failed to get active projects: ${error instanceof Error ? error.message : String(error)}`);
   }
+};
+
+// Get all projects without filters (for compatibility)
+export const getAllProjects = async (): Promise<Project[]> => {
+  return getProjects();
 };
