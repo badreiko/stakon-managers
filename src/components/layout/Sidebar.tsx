@@ -51,8 +51,8 @@ const Sidebar: React.FC<SidebarProps> = ({ open, handleDrawerClose }) => {
     { text: t('navigation.reports'), icon: <ReportsIcon />, path: '/reports' },
   ];
 
-  const bottomMenuItems = [
-    { text: t('navigation.settings'), icon: <SettingsIcon />, path: '/settings' },
+  const bottomMenuItems: { text: string; icon: React.ReactNode; path: string }[] = [
+    // Настройки убраны по запросу
   ];
 
   const handleNavigation = (path: string) => {

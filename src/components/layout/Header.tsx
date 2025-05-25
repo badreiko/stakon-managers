@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   AppBar, 
   Toolbar, 
@@ -13,9 +13,10 @@ import {
   Tooltip,
   Popover,
   Divider,
-  Button
+  Button,
+  Paper
 } from '@mui/material';
-import { styled, alpha } from '@mui/material/styles';
+import { styled, alpha } from '@mui/material';
 import { 
   Menu as MenuIcon, 
   Search as SearchIcon, 
@@ -26,10 +27,14 @@ import {
   MarkChatRead as MarkAllReadIcon
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useTheme } from '../../theme/ThemeProvider';
 import { useNotifications } from '../../context/NotificationContext';
 import NotificationList from '../notifications/NotificationList';
 import ConstructionVehicles from '../animations/ConstructionVehicles';
+import DashboardSearchResults from '../search/DashboardSearchResults';
+import { searchDashboardItems } from '../../services/searchService';
+import { SearchResult } from '../../types/search.types';
 
 const Search = styled('div')(({ theme }: { theme: any }) => ({
   position: 'relative',
@@ -77,8 +82,20 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ open, handleDrawerOpen }) => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const location = useLocation();
   const { mode, toggleTheme } = useTheme();
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
+  
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
+
+  // Поиск только на дашборде
+  const isDashboard = location.pathname === '/';
+  
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [notificationsAnchorEl, setNotificationsAnchorEl] = useState<null | HTMLElement>(null);
 
@@ -101,6 +118,60 @@ const Header: React.FC<HeaderProps> = ({ open, handleDrawerOpen }) => {
   const handleMarkAllAsRead = async () => {
     await markAllAsRead();
   };
+
+  const handleSearchChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const query = event.target.value;
+    setSearchQuery(query);
+
+    if (!query.trim() || !isDashboard) {
+      setSearchResults([]);
+      setSearchOpen(false);
+      return;
+    }
+
+    setIsSearching(true);
+    setSearchOpen(true);
+
+    // Дебаунс поиска
+    setTimeout(async () => {
+      try {
+        const results = await searchDashboardItems(query);
+        setSearchResults(results);
+      } catch (error) {
+        console.error('Search error:', error);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+  };
+
+  const handleResultClick = (result: SearchResult) => {
+    if (result.type === 'task') {
+      // Прокручиваем к задаче на дашборде или открываем детали
+      const taskElement = document.getElementById(`task-${result.id}`);
+      if (taskElement) {
+        taskElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        taskElement.style.animation = 'highlight 2s ease-in-out';
+      }
+    } else if (result.type === 'project') {
+      navigate(`/projects`);
+    }
+    
+    setSearchQuery('');
+    setSearchOpen(false);
+  };
+
+  // Закрытие по клику вне поиска
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setSearchOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const isMenuOpen = Boolean(anchorEl);
   const isNotificationsMenuOpen = Boolean(notificationsAnchorEl);
@@ -172,17 +243,50 @@ const Header: React.FC<HeaderProps> = ({ open, handleDrawerOpen }) => {
             component="div"
             sx={{ display: { xs: 'none', sm: 'block' } }}
           >
-            STAKON
+            J.B.STAKON
           </Typography>
-          <Search>
-            <SearchIconWrapper>
-              <SearchIcon />
-            </SearchIconWrapper>
-            <StyledInputBase
-              placeholder={`${t('common.search')}...`}
-              inputProps={{ 'aria-label': 'search' }}
-            />
-          </Search>
+          <Box ref={searchRef} sx={{ position: 'relative' }}>
+            <Search>
+              <SearchIconWrapper>
+                <SearchIcon />
+              </SearchIconWrapper>
+              <StyledInputBase
+                placeholder={isDashboard ? `${t('dashboard.searchTasks')}...` : `${t('common.search')}...`}
+                inputProps={{ 'aria-label': 'search' }}
+                value={searchQuery}
+                onChange={handleSearchChange}
+                disabled={!isDashboard}
+                sx={{ 
+                  opacity: isDashboard ? 1 : 0.5,
+                  cursor: isDashboard ? 'text' : 'not-allowed'
+                }}
+              />
+            </Search>
+
+            {/* Результаты поиска */}
+            {searchOpen && (
+              <Paper
+                sx={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  right: 0,
+                  mt: 1,
+                  maxHeight: 400,
+                  overflow: 'auto',
+                  zIndex: 1300,
+                  boxShadow: 3
+                }}
+              >
+                <DashboardSearchResults
+                  results={searchResults}
+                  isLoading={isSearching}
+                  onResultClick={handleResultClick}
+                  query={searchQuery}
+                />
+              </Paper>
+            )}
+          </Box>
           <Box sx={{ flexGrow: 1, position: 'relative', height: '40px', mx: 2 }}>
             <ConstructionVehicles />
           </Box>

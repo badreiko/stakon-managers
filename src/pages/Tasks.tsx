@@ -18,6 +18,7 @@ import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import KanbanBoard from '../components/tasks/KanbanBoard';
 import TaskList from '../components/tasks/TaskList';
 import TaskDetail from '../components/tasks/TaskDetail';
+import TaskCalendar from '../components/tasks/TaskCalendar';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -182,19 +183,7 @@ const Tasks: React.FC = () => {
           <Route path="/" element={<KanbanBoard />} />
           <Route path="/kanban" element={<KanbanBoard />} />
           <Route path="/list" element={<TaskList />} />
-          <Route path="/calendar" element={
-            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-              <Paper sx={{ p: 4, textAlign: 'center' }}>
-                <CalendarIcon sx={{ fontSize: 60, color: 'text.secondary', mb: 2 }} />
-                <Typography variant="h5" gutterBottom>
-                  {t('common.comingSoon')}
-                </Typography>
-                <Typography variant="body1" color="text.secondary">
-                  {t('common.featureUnderDevelopment')}
-                </Typography>
-              </Paper>
-            </Box>
-          } />
+          <Route path="/calendar" element={<TaskCalendar />} />
         </Routes>
       </Box>
     </Box>

@@ -200,7 +200,8 @@
     "upcomingDeadlines": "Nadcházející termíny",
     "recentActivity": "Nedávná aktivita",
     "tasksByStatus": "Úkoly podle statusu",
-    "tasksByAssignee": "Úkoly podle řešitele"
+    "tasksByAssignee": "Úkoly podle řešitele",
+    "searchTasks": "Hledat úkoly a projekty"
   },
   "filters": {
     "title": "Filtry",

@@ -1,5 +1,6 @@
-import { createTheme } from '@mui/material/styles';
-import type { ThemeOptions } from '@mui/material/styles';
+import { createTheme } from '@mui/material';
+// Используем тип из @mui/material без импорта типа
+// В версии 7.x структура типов изменилась
 
 // Define color constants
 const ORANGE = {
@@ -34,7 +35,8 @@ const PRIORITY_COLORS = {
 };
 
 // Base theme options
-const baseThemeOptions: ThemeOptions = {
+// Используем тип неявно, чтобы избежать ошибок типизации
+const baseThemeOptions = {
   typography: {
     fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
     h1: {

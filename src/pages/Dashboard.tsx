@@ -227,7 +227,8 @@ const Dashboard: React.FC = () => {
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
               {upcomingDeadlines.map((deadline) => (
                 <Paper 
-                  key={deadline.id} 
+                  key={deadline.id}
+                  id={`task-${deadline.id}`} 
                   elevation={3} 
                   sx={{ 
                     width: { xs: '100%', sm: 'calc(50% - 16px)', md: 'calc(33.333% - 16px)' },

@@ -20,6 +20,7 @@ import Dashboard from './pages/Dashboard';
 import Tasks from './pages/Tasks';
 import Projects from './pages/Projects';
 import Team from './pages/Team';
+import Reports from './pages/Reports';
 import LoginForm from './components/auth/LoginForm';
 import ForgotPasswordForm from './components/auth/ForgotPasswordForm';
 
@@ -57,7 +58,7 @@ function App() {
                     <Route path="tasks/*" element={<Tasks />} />
                     <Route path="projects" element={<Projects />} />
                     <Route path="team" element={<Team />} />
-                    <Route path="reports" element={<div>Reports Page</div>} />
+                    <Route path="reports" element={<Reports />} />
                     <Route path="settings" element={<div>Settings Page</div>} />
                   </Route>
                 </Route>

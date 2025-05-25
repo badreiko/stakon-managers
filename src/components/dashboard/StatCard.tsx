@@ -1,14 +1,13 @@
 import React from 'react';
 import { Box, Card, CardContent, Typography } from '@mui/material';
 import type { SxProps } from '@mui/system';
-import type { Theme } from '@mui/material/styles';
 
 interface StatCardProps {
   title: string;
   value: string | number;
   icon: React.ReactNode;
   color?: string;
-  sx?: SxProps<Theme>;
+  sx?: SxProps<any>; // Используем any вместо Theme для совместимости с версией 7.x
 }
 
 const StatCard: React.FC<StatCardProps> = ({ title, value, icon, color = 'primary.main', sx }) => {
