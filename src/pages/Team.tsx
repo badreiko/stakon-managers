@@ -54,6 +54,8 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { User, UserRole } from '../types/user.types';
 import { getUsers, createUser, updateUser, deleteUser } from '../services/userService';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { db } from '../firebase/config';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -121,22 +123,129 @@ const Team: React.FC = () => {
     position: ''
   });
 
+  // Проверка, есть ли текущий пользователь в списке
+  const ensureCurrentUserInList = async (fetchedUsers: User[], currentAuthUser: any) => {
+    // Проверяем, есть ли текущий пользователь в списке
+    const currentUserInList = fetchedUsers.find(
+      user => user.uid === currentAuthUser.uid || user.email.toLowerCase() === currentAuthUser.email?.toLowerCase()
+    );
+    
+    if (!currentUserInList && currentAuthUser.email) {
+      console.log('Current user not found in the list, adding...', currentAuthUser);
+      
+      try {
+        // Создаем базовые данные пользователя в Firestore
+        const userRef = doc(db, 'users', currentAuthUser.uid);
+        const userDoc = await getDoc(userRef);
+        
+        if (!userDoc.exists()) {
+          // Если документ пользователя не существует, создаем его
+          const now = new Date();
+          await setDoc(userRef, {
+            email: currentAuthUser.email,
+            displayName: currentAuthUser.displayName || currentAuthUser.email.split('@')[0],
+            photoURL: currentAuthUser.photoURL || '',
+            role: 'employee', // По умолчанию сотрудник
+            position: '',
+            department: '',
+            phoneNumber: '',
+            workingHours: {
+              start: '09:00',
+              end: '17:00',
+              workDays: [1, 2, 3, 4, 5]
+            },
+            timezone: 'Europe/Prague',
+            notificationSettings: {
+              email: true,
+              inApp: true,
+              push: false,
+              newTask: true,
+              statusChange: true,
+              deadlineApproaching: true,
+              comments: true,
+              mentions: true
+            },
+            createdAt: now,
+            lastActive: now,
+            performance: {}
+          });
+          
+          // Получаем обновленные данные пользователя
+          const updatedUserDoc = await getDoc(userRef);
+          if (updatedUserDoc.exists()) {
+            const newUser: User = {
+              uid: currentAuthUser.uid,
+              email: currentAuthUser.email,
+              displayName: currentAuthUser.displayName || currentAuthUser.email.split('@')[0],
+              photoURL: currentAuthUser.photoURL || '',
+              role: 'employee' as UserRole,
+              position: '',
+              department: '',
+              phoneNumber: '',
+              workingHours: {
+                start: '09:00',
+                end: '17:00',
+                workDays: [1, 2, 3, 4, 5]
+              },
+              timezone: 'Europe/Prague',
+              notificationSettings: {
+                email: true,
+                inApp: true,
+                push: false,
+                newTask: true,
+                statusChange: true,
+                deadlineApproaching: true,
+                comments: true,
+                mentions: true
+              },
+              createdAt: now,
+              lastActive: now,
+              performance: {
+                tasksCompleted: 0,
+                tasksOverdue: 0,
+                averageCompletionTime: 0,
+                onTimeCompletionRate: 0
+              }
+            };
+            
+            // Добавляем пользователя в список
+            const updatedUsers: User[] = [...fetchedUsers, newUser];
+            return updatedUsers;
+          }
+        }
+      } catch (error) {
+        console.error('Error adding current user to the list:', error);
+      }
+    }
+    
+    return fetchedUsers;
+  };
+
   // Fetch users
   useEffect(() => {
     const fetchUsers = async () => {
       setLoading(true);
       try {
-        const fetchedUsers = await getUsers();
+        console.log('Fetching users from Firestore...');
+        let fetchedUsers = await getUsers();
+        console.log('Fetched users:', fetchedUsers);
+        
+        // Проверяем, есть ли текущий пользователь в списке
+        if (currentUser) {
+          fetchedUsers = await ensureCurrentUserInList(fetchedUsers, currentUser);
+        }
+        
         setUsers(fetchedUsers);
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error fetching users:', error);
+        alert(`Chyba při načítání uživatelů: ${error.message || String(error)}`);
       } finally {
         setLoading(false);
       }
     };
 
     fetchUsers();
-  }, []);
+  }, [currentUser]);
 
   // Handle tab change
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
@@ -218,10 +327,16 @@ const Team: React.FC = () => {
     }
   };
 
+  // Проверка, есть ли пользователь с таким email в списке
+  const findUserByEmail = (email: string) => {
+    return users.find(user => user.email.toLowerCase() === email.toLowerCase());
+  };
+
   // Handle form submit
   const handleFormSubmit = async () => {
-    setFormLoading(true);
+    if (!currentUser) return;
     
+    setFormLoading(true);
     try {
       if (selectedUser) {
         // Update existing user
@@ -229,7 +344,11 @@ const Team: React.FC = () => {
           displayName: formData.displayName,
           role: formData.role,
           phoneNumber: formData.phoneNumber,
-          workingHours: formData.workingHours,
+          workingHours: {
+            start: formData.workingHours.start,
+            end: formData.workingHours.end,
+            workDays: formData.workingHours.workDays
+          },
           timezone: formData.timezone,
           department: formData.department,
           position: formData.position
@@ -237,18 +356,31 @@ const Team: React.FC = () => {
         
         // Update the user in the UI
         setUsers(users.map(user => 
-          user.uid === selectedUser.uid ? { ...user, ...updatedUser } : user
+          user.uid === updatedUser.uid ? updatedUser : user
         ));
+        
+        console.log('User updated successfully:', updatedUser);
       } else {
-        // Create new user
-        const newUser = await createUser(
-          formData.email,
-          formData.password,
-          {
+        // Проверяем, является ли это текущим авторизованным пользователем
+        const isCurrentUser = currentUser.email?.toLowerCase() === formData.email.toLowerCase();
+        
+        // Проверяем, существует ли пользователь с таким email в списке
+        const existingUser = findUserByEmail(formData.email);
+        
+        if (isCurrentUser || existingUser) {
+          // Это текущий пользователь или пользователь с таким email уже существует
+          const userId = isCurrentUser ? currentUser.uid : existingUser!.uid;
+          
+          // Обновляем данные существующего пользователя
+          const updatedUser = await updateUser(userId, {
             displayName: formData.displayName,
             role: formData.role,
             phoneNumber: formData.phoneNumber,
-            workingHours: formData.workingHours,
+            workingHours: {
+              start: formData.workingHours.start,
+              end: formData.workingHours.end,
+              workDays: formData.workingHours.workDays
+            },
             timezone: formData.timezone,
             department: formData.department,
             position: formData.position,
@@ -262,11 +394,55 @@ const Team: React.FC = () => {
               comments: true,
               mentions: true
             }
+          });
+          
+          if (existingUser) {
+            // Обновляем пользователя в UI
+            setUsers(users.map(user => 
+              user.uid === updatedUser.uid ? updatedUser : user
+            ));
+          } else {
+            // Добавляем нового пользователя в UI
+            setUsers(prevUsers => [updatedUser, ...prevUsers]);
           }
-        );
-        
-        // Add the new user to the UI
-        setUsers([...users, newUser]);
+          
+          console.log('User data updated successfully:', updatedUser);
+          alert(`Uživatelské údaje byly úspěšně aktualizovány.`);
+        } else {
+          // Создаем нового пользователя
+          const newUser = await createUser(
+            formData.email,
+            formData.password,
+            {
+              displayName: formData.displayName,
+              role: formData.role,
+              phoneNumber: formData.phoneNumber,
+              workingHours: {
+                start: formData.workingHours.start,
+                end: formData.workingHours.end,
+                workDays: formData.workingHours.workDays
+              },
+              timezone: formData.timezone,
+              department: formData.department,
+              position: formData.position,
+              notificationSettings: {
+                email: true,
+                inApp: true,
+                push: false,
+                newTask: true,
+                statusChange: true,
+                deadlineApproaching: true,
+                comments: true,
+                mentions: true
+              }
+            }
+          );
+          
+          // Добавляем нового пользователя в UI
+          setUsers(prevUsers => [newUser, ...prevUsers]);
+          
+          console.log('User created successfully:', newUser);
+        }
       }
       
       // Close the form
@@ -289,8 +465,9 @@ const Team: React.FC = () => {
         department: '',
         position: ''
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving user:', error);
+      alert(`Chyba při ukládání uživatele: ${error.message || String(error)}`);
     } finally {
       setFormLoading(false);
     }
@@ -308,7 +485,8 @@ const Team: React.FC = () => {
   };
   
   // Filter users by role
-  const filterUsersByRole = (role: UserRole) => {
+  const filterUsersByRole = (role: UserRole | 'all') => {
+    if (role === 'all') return users;
     return users.filter(user => user.role === role);
   };
   
@@ -338,104 +516,136 @@ const Team: React.FC = () => {
       
       {/* All members tab */}
       <TabPanel value={tabValue} index={0}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-          <Typography variant="h5" component="h2">
-            {t('team.teamMembers')}
-          </Typography>
-          {userData?.role === 'admin' && (
-            <Button 
-              variant="contained" 
+        <Box>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+            <Typography variant="h4" component="h1">
+              Tým
+            </Typography>
+            <Button
+              variant="contained"
+              color="primary"
               startIcon={<PersonAddIcon />}
               onClick={() => {
                 setSelectedUser(null);
                 setUserFormOpen(true);
               }}
             >
-              {t('team.addMember')}
+              Přidat uživatele
             </Button>
-          )}
+          </Box>
         </Box>
-        
         <TableContainer component={Paper}>
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell>{t('team.name')}</TableCell>
-                <TableCell>{t('team.role')}</TableCell>
-                <TableCell>{t('team.contact')}</TableCell>
-                <TableCell align="right">{t('common.actions')}</TableCell>
+                <TableCell>Uživatel</TableCell>
+                <TableCell>Role</TableCell>
+                <TableCell>Pozice</TableCell>
+                <TableCell>Oddělení</TableCell>
+                <TableCell>Kontakt</TableCell>
+                <TableCell>Pracovní doba</TableCell>
+                <TableCell>Akce</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={4} align="center" sx={{ py: 3 }}>
+                  <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
                     <CircularProgress />
+                    <Typography variant="body2" sx={{ mt: 2, color: 'text.secondary' }}>
+                      Načítám uživatele...
+                    </Typography>
                   </TableCell>
                 </TableRow>
               ) : users.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={4} align="center" sx={{ py: 3 }}>
-                    <Typography variant="body1">
-                      {t('team.noMembers')}
-                    </Typography>
+                  <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                    <Box sx={{ textAlign: 'center' }}>
+                      <PersonAddIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
+                      <Typography variant="h6" color="text.secondary" gutterBottom>
+                        Žádní uživatelé
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Zatím nejsou žádní uživatelé v systému. Přidejte nového uživatele kliknutím na tlačítko "Přidat uživatele".
+                      </Typography>
+                    </Box>
                   </TableCell>
                 </TableRow>
               ) : (
-                users
+                filterUsersByRole('all')
                   .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                  .map(user => (
-                    <TableRow key={user.uid}>
+                  .map((user) => (
+                    <TableRow key={user.uid} hover>
                       <TableCell>
                         <Box sx={{ display: 'flex', alignItems: 'center' }}>
                           <Avatar 
                             src={user.photoURL || undefined} 
                             alt={user.displayName}
-                            sx={{ mr: 2 }}
+                            sx={{ width: 40, height: 40, mr: 2 }}
                           >
-                            {!user.photoURL && getInitials(user.displayName)}
+                            {getInitials(user.displayName)}
                           </Avatar>
                           <Box>
-                            <Typography variant="subtitle1">
+                            <Typography variant="subtitle2">
                               {user.displayName}
                             </Typography>
-                            <Typography variant="body2" color="textSecondary">
-                              {user.position}
+                            <Typography variant="body2" color="text.secondary">
+                              {user.email}
                             </Typography>
                           </Box>
                         </Box>
                       </TableCell>
                       <TableCell>
                         <Chip 
-                          label={t(`team.roles.${user.role}`)} 
+                          label={user.role === 'admin' ? 'Administrátor' : 'Zaměstnanec'} 
                           size="small" 
                           sx={{ 
                             bgcolor: `${roleColors[user.role]}20`,
-                            color: roleColors[user.role]
+                            color: roleColors[user.role],
+                            fontWeight: 500
                           }} 
                         />
                       </TableCell>
+                      <TableCell>{user.position || '-'}</TableCell>
+                      <TableCell>{user.department || '-'}</TableCell>
                       <TableCell>
-                        <Box sx={{ display: 'flex' }}>
-                          {user.phoneNumber && (
-                            <IconButton size="small" color="primary">
-                              <PhoneIcon fontSize="small" />
-                            </IconButton>
-                          )}
-                          <IconButton size="small" color="primary">
-                            <EmailIcon fontSize="small" />
-                          </IconButton>
+                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                          <EmailIcon fontSize="small" sx={{ color: 'text.secondary', mr: 1 }} />
+                          <Typography variant="body2">{user.email}</Typography>
+                        </Box>
+                        {user.phoneNumber ? (
+                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                            <PhoneIcon fontSize="small" sx={{ color: 'text.secondary', mr: 1 }} />
+                            <Typography variant="body2">{user.phoneNumber}</Typography>
+                          </Box>
+                        ) : (
+                          <Box sx={{ display: 'flex', alignItems: 'center', color: 'text.disabled' }}>
+                            <PhoneIcon fontSize="small" sx={{ mr: 1 }} />
+                            <Typography variant="body2">Není zadáno</Typography>
+                          </Box>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                          <AccessTimeIcon fontSize="small" sx={{ color: 'text.secondary', mr: 1 }} />
+                          <Typography variant="body2">
+                            {user.workingHours?.start || '09:00'} - {user.workingHours?.end || '17:00'}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                          <LocationOnIcon fontSize="small" sx={{ color: 'text.secondary', mr: 1 }} />
+                          <Typography variant="body2">{user.timezone || 'Europe/Prague'}</Typography>
                         </Box>
                       </TableCell>
-                      <TableCell align="right">
-                        {userData?.role === 'admin' && (
-                          <IconButton
-                            size="small"
-                            onClick={(e: React.MouseEvent<HTMLButtonElement>) => handleMenuOpen(e, user)}
-                          >
-                            <MoreVertIcon />
-                          </IconButton>
-                        )}
+                      <TableCell>
+                        <IconButton
+                          aria-label="Více akcí"
+                          onClick={(event: React.MouseEvent<HTMLElement>) => handleMenuOpen(event, user)}
+                          size="small"
+                          sx={{ color: 'primary.main' }}
+                        >
+                          <MoreVertIcon />
+                        </IconButton>
                       </TableCell>
                     </TableRow>
                   ))
@@ -445,16 +655,19 @@ const Team: React.FC = () => {
           <TablePagination
             rowsPerPageOptions={[5, 10, 25]}
             component="div"
-            count={users.length}
+            count={filterUsersByRole('all').length}
             rowsPerPage={rowsPerPage}
             page={page}
             onPageChange={handleChangePage}
             onRowsPerPageChange={handleChangeRowsPerPage}
+            labelRowsPerPage="Řádků na stránku:"
+            labelDisplayedRows={({ from, to, count }: { from: number; to: number; count: number }) => `${from}-${to} z ${count}`}
           />
         </TableContainer>
       </TabPanel>
       
       {/* Admins tab */}
+// ...
       <TabPanel value={tabValue} index={1}>
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
           {loading ? (

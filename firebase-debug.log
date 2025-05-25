@@ -1,0 +1,33 @@
+[debug] [2025-05-24T23:32:11.875Z] ----------------------------------------------------------------------
+[debug] [2025-05-24T23:32:11.884Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\T450s\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js login --no-localhost
+[debug] [2025-05-24T23:32:11.884Z] CLI Version:   14.4.0
+[debug] [2025-05-24T23:32:11.884Z] Platform:      win32
+[debug] [2025-05-24T23:32:11.885Z] Node Version:  v23.9.0
+[debug] [2025-05-24T23:32:11.885Z] Time:          Sun May 25 2025 01:32:11 GMT+0200 (středoevropský letní čas)
+[debug] [2025-05-24T23:32:11.885Z] ----------------------------------------------------------------------
+[debug] 
+[info] i  Firebase optionally collects CLI and Emulator Suite usage and error reporting information to help improve our products. Data is collected in accordance with Google's privacy policy (https://policies.google.com/privacy) and is not used to identify you.
+ 
+[debug] [2025-05-24T23:36:03.555Z] ----------------------------------------------------------------------
+[debug] [2025-05-24T23:36:03.561Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\T450s\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js login --interactive
+[debug] [2025-05-24T23:36:03.562Z] CLI Version:   14.4.0
+[debug] [2025-05-24T23:36:03.562Z] Platform:      win32
+[debug] [2025-05-24T23:36:03.562Z] Node Version:  v23.9.0
+[debug] [2025-05-24T23:36:03.563Z] Time:          Sun May 25 2025 01:36:03 GMT+0200 (středoevropský letní čas)
+[debug] [2025-05-24T23:36:03.563Z] ----------------------------------------------------------------------
+[debug] 
+[info] i  Firebase optionally collects CLI and Emulator Suite usage and error reporting information to help improve our products. Data is collected in accordance with Google's privacy policy (https://policies.google.com/privacy) and is not used to identify you.
+ 
+[debug] [2025-05-24T23:37:12.805Z] ExitPromptError: User force closed the prompt with SIGINT
+    at Interface.sigint (C:\Users\T450s\AppData\Roaming\npm\node_modules\firebase-tools\node_modules\@inquirer\core\dist\commonjs\lib\create-prompt.js:100:37)
+    at Interface.emit (node:events:507:28)
+    at Interface.emit (node:domain:489:12)
+    at [_ttyWrite] [as _ttyWrite] (node:internal/readline/interface:1129:18)
+    at ReadStream.onkeypress (node:internal/readline/interface:268:20)
+    at ReadStream.emit (node:events:519:35)
+    at ReadStream.emit (node:domain:489:12)
+    at emitKeys (node:internal/readline/utils:370:14)
+    at emitKeys.next (<anonymous>)
+    at ReadStream.onData (node:internal/readline/emitKeypressEvents:64:36)
+[error] 
+[error] Error: An unexpected error has occurred.

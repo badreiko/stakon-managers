@@ -97,6 +97,35 @@ export const lightTheme = createTheme({
       primary: '#333333',
       secondary: '#666666',
     },
+    divider: 'rgba(0, 0, 0, 0.12)',
+  },
+  components: {
+    ...baseThemeOptions.components,
+    MuiCard: {
+      styleOverrides: {
+        root: {
+          borderRadius: 8,
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+          backgroundColor: '#FFFFFF',
+        },
+      },
+    },
+    MuiTableCell: {
+      styleOverrides: {
+        root: {
+          borderBottom: '1px solid rgba(0, 0, 0, 0.08)',
+        },
+      },
+    },
+    MuiListItem: {
+      styleOverrides: {
+        root: {
+          '&:hover': {
+            backgroundColor: 'rgba(0, 0, 0, 0.04)',
+          },
+        },
+      },
+    },
   },
 });
 
@@ -114,6 +143,42 @@ export const darkTheme = createTheme({
     text: {
       primary: '#FFFFFF',
       secondary: '#AAAAAA',
+    },
+    divider: 'rgba(255, 255, 255, 0.12)',
+  },
+  components: {
+    ...baseThemeOptions.components,
+    MuiCard: {
+      styleOverrides: {
+        root: {
+          borderRadius: 8,
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
+          backgroundColor: '#252525',
+        },
+      },
+    },
+    MuiPaper: {
+      styleOverrides: {
+        root: {
+          backgroundImage: 'none',
+        },
+      },
+    },
+    MuiTableCell: {
+      styleOverrides: {
+        root: {
+          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+        },
+      },
+    },
+    MuiListItem: {
+      styleOverrides: {
+        root: {
+          '&:hover': {
+            backgroundColor: 'rgba(255, 255, 255, 0.05)',
+          },
+        },
+      },
     },
   },
 });

@@ -10,18 +10,26 @@ import {
   MenuItem, 
   InputBase,
   Box,
-  Tooltip
+  Tooltip,
+  Popover,
+  Divider,
+  Button
 } from '@mui/material';
 import { styled, alpha } from '@mui/material/styles';
 import { 
   Menu as MenuIcon, 
   Search as SearchIcon, 
   Notifications as NotificationsIcon, 
+  NotificationsNone as NotificationsNoneIcon,
   Brightness4 as DarkModeIcon, 
-  Brightness7 as LightModeIcon
+  Brightness7 as LightModeIcon,
+  MarkChatRead as MarkAllReadIcon
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../theme/ThemeProvider';
+import { useNotifications } from '../../context/NotificationContext';
+import NotificationList from '../notifications/NotificationList';
+import ConstructionVehicles from '../animations/ConstructionVehicles';
 
 const Search = styled('div')(({ theme }: { theme: any }) => ({
   position: 'relative',
@@ -70,6 +78,7 @@ interface HeaderProps {
 const Header: React.FC<HeaderProps> = ({ open, handleDrawerOpen }) => {
   const { t } = useTranslation();
   const { mode, toggleTheme } = useTheme();
+  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [notificationsAnchorEl, setNotificationsAnchorEl] = useState<null | HTMLElement>(null);
 
@@ -87,6 +96,10 @@ const Header: React.FC<HeaderProps> = ({ open, handleDrawerOpen }) => {
 
   const handleNotificationsMenuClose = () => {
     setNotificationsAnchorEl(null);
+  };
+  
+  const handleMarkAllAsRead = async () => {
+    await markAllAsRead();
   };
 
   const isMenuOpen = Boolean(anchorEl);
@@ -118,7 +131,7 @@ const Header: React.FC<HeaderProps> = ({ open, handleDrawerOpen }) => {
   );
 
   const renderNotificationsMenu = (
-    <Menu
+    <Popover
       anchorEl={notificationsAnchorEl}
       anchorOrigin={{
         vertical: 'bottom',
@@ -132,23 +145,12 @@ const Header: React.FC<HeaderProps> = ({ open, handleDrawerOpen }) => {
       }}
       open={isNotificationsMenuOpen}
       onClose={handleNotificationsMenuClose}
+      PaperProps={{
+        sx: { width: 320, maxHeight: 450, overflow: 'hidden' }
+      }}
     >
-      <MenuItem onClick={handleNotificationsMenuClose}>
-        <Typography variant="body2">
-          {t('tasks.newTask')}: Dokončit návrh webu
-        </Typography>
-      </MenuItem>
-      <MenuItem onClick={handleNotificationsMenuClose}>
-        <Typography variant="body2">
-          {t('tasks.statuses.review')}: Implementace dashboardu
-        </Typography>
-      </MenuItem>
-      <MenuItem onClick={handleNotificationsMenuClose}>
-        <Typography variant="body2">
-          {t('tasks.deadline')}: Projekt Stakon - zítra
-        </Typography>
-      </MenuItem>
-    </Menu>
+      <NotificationList onClose={handleNotificationsMenuClose} />
+    </Popover>
   );
 
   return (
@@ -181,24 +183,28 @@ const Header: React.FC<HeaderProps> = ({ open, handleDrawerOpen }) => {
               inputProps={{ 'aria-label': 'search' }}
             />
           </Search>
-          <Box sx={{ flexGrow: 1 }} />
-          <Box sx={{ display: 'flex' }}>
+          <Box sx={{ flexGrow: 1, position: 'relative', height: '40px', mx: 2 }}>
+            <ConstructionVehicles />
+          </Box>
+          <Box sx={{ display: 'flex', position: 'relative', zIndex: 1 }}>
             <Tooltip title={mode === 'light' ? 'Tmavý režim' : 'Světlý režim'}>
               <IconButton color="inherit" onClick={toggleTheme}>
                 {mode === 'light' ? <DarkModeIcon /> : <LightModeIcon />}
               </IconButton>
             </Tooltip>
-            <IconButton
-              color="inherit"
-              aria-label="show new notifications"
-              aria-controls={notificationsMenuId}
-              aria-haspopup="true"
-              onClick={handleNotificationsMenuOpen}
-            >
-              <Badge badgeContent={3} color="error">
-                <NotificationsIcon />
-              </Badge>
-            </IconButton>
+            <Tooltip title={t('notifications.title')}>
+              <IconButton
+                color="inherit"
+                aria-label="show new notifications"
+                aria-controls={notificationsMenuId}
+                aria-haspopup="true"
+                onClick={handleNotificationsMenuOpen}
+              >
+                <Badge badgeContent={unreadCount} color="error" invisible={unreadCount === 0}>
+                  {unreadCount > 0 ? <NotificationsIcon /> : <NotificationsNoneIcon />}
+                </Badge>
+              </IconButton>
+            </Tooltip>
             <IconButton
               edge="end"
               aria-label="account of current user"

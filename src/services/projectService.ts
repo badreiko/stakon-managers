@@ -17,7 +17,7 @@ import {
   arrayUnion,
   arrayRemove
 } from 'firebase/firestore';
-import { db } from '../firebase/config';
+import { db, auth } from '../firebase/config';
 import { 
   Project,
   ProjectFilter,
@@ -89,6 +89,14 @@ const convertToProject = (doc: QueryDocumentSnapshot<DocumentData>): Project => 
 export const getProjects = async (options?: ProjectListOptions): Promise<Project[]> => {
   try {
     console.log('Getting projects from Firestore...');
+    
+    // Проверяем, авторизован ли пользователь
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      console.error('User is not authenticated');
+      throw new Error('User is not authenticated');
+    }
+    
     const collectionRef = collection(db, PROJECTS_COLLECTION);
     let queryConstraints = [];
 
@@ -474,6 +482,14 @@ export const getProjectsByManager = async (managerId: string): Promise<Project[]
 export const getActiveProjects = async (): Promise<Project[]> => {
   try {
     console.log('Getting active projects');
+    
+    // Проверяем, авторизован ли пользователь
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      console.error('User is not authenticated');
+      throw new Error('User is not authenticated');
+    }
+    
     const q = query(
       collection(db, PROJECTS_COLLECTION),
       where('status', '==', 'active'),
@@ -501,5 +517,34 @@ export const getActiveProjects = async (): Promise<Project[]> => {
 
 // Get all projects without filters (for compatibility)
 export const getAllProjects = async (): Promise<Project[]> => {
-  return getProjects();
+  try {
+    console.log('Getting ALL projects from Firestore...');
+    
+    // Проверяем, авторизован ли пользователь
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      console.error('User is not authenticated');
+      throw new Error('User is not authenticated');
+    }
+    
+    const collectionRef = collection(db, PROJECTS_COLLECTION);
+    const q = query(collectionRef, orderBy('updatedAt', 'desc'));
+    
+    const querySnapshot = await getDocs(q);
+    const projects: Project[] = [];
+    
+    querySnapshot.forEach((doc) => {
+      try {
+        projects.push(convertToProject(doc));
+      } catch (error) {
+        console.error('Error converting project document:', doc.id, error);
+      }
+    });
+    
+    console.log(`Found ${projects.length} projects in total`);
+    return projects;
+  } catch (error) {
+    console.error('Error getting all projects:', error);
+    throw new Error(`Failed to get all projects: ${error instanceof Error ? error.message : String(error)}`);
+  }
 };

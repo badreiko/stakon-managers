@@ -7,8 +7,9 @@ import { SnackbarProvider } from 'notistack';
 import ThemeProvider from './theme/ThemeProvider';
 import './i18n/i18n';
 
-// Auth Provider
+// Providers
 import AuthProvider from './context/AuthContext';
+import { NotificationProvider } from './context/NotificationContext';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 
 // Layout
@@ -47,7 +48,11 @@ function App() {
                 
                 {/* Protected routes */}
                 <Route path="/" element={<ProtectedRoute />}>
-                  <Route element={<Layout />}>
+                  <Route element={
+                    <NotificationProvider>
+                      <Layout />
+                    </NotificationProvider>
+                  }>
                     <Route index element={<Dashboard />} />
                     <Route path="tasks/*" element={<Tasks />} />
                     <Route path="projects" element={<Projects />} />
@@ -59,7 +64,11 @@ function App() {
                 
                 {/* Admin-only routes */}
                 <Route path="admin" element={<ProtectedRoute requireAdmin={true} />}>
-                  <Route element={<Layout />}>
+                  <Route element={
+                    <NotificationProvider>
+                      <Layout />
+                    </NotificationProvider>
+                  }>
                     <Route index element={<div>Admin Page</div>} />
                   </Route>
                 </Route>

@@ -43,7 +43,7 @@ import { Task, TaskPriority, TaskStatus } from '../../types/task.types';
 import { Project } from '../../types/project.types';
 import { User } from '../../types/user.types';
 import { createTask, updateTask } from '../../services/taskService';
-import { getActiveProjects } from '../../services/projectService';
+import { getAllProjects } from '../../services/projectService';
 import { getUsers } from '../../services/userService';
 import { db } from '../../firebase/config';
 import { addDoc, collection, doc, updateDoc } from 'firebase/firestore';
@@ -147,18 +147,32 @@ const TaskForm: React.FC<TaskFormProps> = ({ task, open, onClose, onSuccess }) =
   useEffect(() => {
     const fetchData = async () => {
       try {
+        console.log('Начинаем загрузку данных для формы задачи...');
+        
         // Fetch users
+        console.log('Загружаем пользователей...');
         const fetchedUsers = await getUsers();
+        console.log('Загружено пользователей:', fetchedUsers.length);
         setUsers(fetchedUsers);
 
         // Fetch projects
-        const fetchedProjects = await getActiveProjects();
-        setProjects(fetchedProjects);
+        console.log('Загружаем проекты...');
+        try {
+          const fetchedProjects = await getAllProjects();
+          console.log('Загружено проектов:', fetchedProjects.length, fetchedProjects);
+          setProjects(fetchedProjects);
+        } catch (projectError) {
+          console.error('Ошибка при загрузке проектов:', projectError);
+          setSaveError(`Ошибка при загрузке проектов: ${projectError instanceof Error ? projectError.message : String(projectError)}`);
+        }
 
         // Mock available tags (in a real app, these would come from the backend)
         setAvailableTags(['urgent', 'bug', 'feature', 'documentation', 'design', 'backend', 'frontend']);
+        
+        console.log('Загрузка данных для формы задачи завершена');
       } catch (error) {
-        console.error('Error fetching form data:', error);
+        console.error('Общая ошибка при загрузке данных формы:', error);
+        setSaveError(`Ошибка при загрузке данных: ${error instanceof Error ? error.message : String(error)}`);
       }
     };
 
@@ -204,25 +218,67 @@ const TaskForm: React.FC<TaskFormProps> = ({ task, open, onClose, onSuccess }) =
     setSaveError(null);
     
     try {
-      const taskData = {
-        ...data,
-        createdBy: currentUser?.uid || '',
-        attachments: [],
-        comments: [],
-        history: [],
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-
       if (task) {
-        // Update existing task
+        // Обновление существующей задачи
         const taskRef = doc(db, 'tasks', task.id);
+        
+        // Сохраняем текущие значения статуса и прогресса, если они не были изменены
+        const status = data.status === task.status ? task.status : data.status;
+        const progress = data.progress === task.progress ? task.progress : data.progress;
+        
+        // Сохраняем существующие вложения и комментарии
+        const attachments = task.attachments || [];
+        const comments = task.comments || [];
+        const history = task.history || [];
+        const createdAt = task.createdAt || new Date();
+        const createdBy = task.createdBy || currentUser?.uid || '';
+        
+        // Добавляем запись в историю об изменении задачи
+        const newHistoryEntry = {
+          id: Date.now().toString(),
+          userId: currentUser.uid,
+          action: 'update',
+          timestamp: new Date(),
+          details: {
+            changedFields: Object.keys(data).filter(key => {
+              const k = key as keyof TaskFormInputs;
+              return data[k] !== (task as any)[k];
+            })
+          }
+        };
+        
+        const updatedHistory = [...history, newHistoryEntry];
+        
         await updateDoc(taskRef, {
-          ...taskData,
+          title: data.title,
+          description: data.description,
+          assignee: data.assignee,
+          priority: data.priority,
+          status: status,
+          project: data.project,
+          deadline: data.deadline,
+          estimatedTime: data.estimatedTime,
+          tags: data.tags,
+          progress: progress,
+          attachments: attachments,
+          comments: comments,
+          history: updatedHistory,
+          createdBy: createdBy,
+          createdAt: createdAt,
           updatedAt: new Date()
         });
       } else {
-        // Create new task
+        // Создание новой задачи
+        const taskData = {
+          ...data,
+          createdBy: currentUser?.uid || '',
+          attachments: [],
+          comments: [],
+          history: [],
+          createdAt: new Date(),
+          updatedAt: new Date()
+        };
+        
         await addDoc(collection(db, 'tasks'), taskData);
       }
       
@@ -368,6 +424,105 @@ const TaskForm: React.FC<TaskFormProps> = ({ task, open, onClose, onSuccess }) =
                     />
                   )}
                 />
+              </Box>
+              
+              <Box sx={{ display: 'flex', gap: 2 }}>
+                <Box sx={{ flex: 1 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                    <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
+                      Projekt
+                    </Typography>
+                  </Box>
+                  <Controller
+                    name="project"
+                    control={control}
+                    render={({ field }) => (
+                      <FormControl fullWidth error={!!errors.project} disabled={loading}>
+                        <Select
+                          {...field}
+                          displayEmpty
+                          variant="outlined"
+                          sx={{
+                            bgcolor: '#444',
+                            color: 'white',
+                            '& .MuiOutlinedInput-notchedOutline': {
+                              borderColor: 'rgba(255,255,255,0.2)'
+                            },
+                            '&:hover .MuiOutlinedInput-notchedOutline': {
+                              borderColor: 'rgba(255,255,255,0.3)'
+                            },
+                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                              borderColor: '#ff5722'
+                            },
+                            '& .MuiSelect-icon': {
+                              color: 'white'
+                            }
+                          }}
+                        >
+                          <MenuItem value="">
+                            <em>Žádný projekt</em>
+                          </MenuItem>
+                          {projects.map((project) => {
+                            // Избегаем отображения объекта Date напрямую
+                            return (
+                              <MenuItem key={project.id} value={project.id}>
+                                {project.name || 'Projekt bez názvu'}
+                              </MenuItem>
+                            );
+                          })}
+                        </Select>
+                      </FormControl>
+                    )}
+                  />
+                </Box>
+              </Box>
+              
+              <Box sx={{ display: 'flex', gap: 2 }}>
+                <Box sx={{ flex: 1 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                    <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
+                      Řešitel
+                    </Typography>
+                  </Box>
+                  <Controller
+                    name="assignee"
+                    control={control}
+                    render={({ field }) => (
+                      <FormControl fullWidth error={!!errors.assignee} disabled={loading}>
+                        <Select
+                          {...field}
+                          displayEmpty
+                          variant="outlined"
+                          sx={{
+                            bgcolor: '#444',
+                            color: 'white',
+                            '& .MuiOutlinedInput-notchedOutline': {
+                              borderColor: 'rgba(255,255,255,0.2)'
+                            },
+                            '&:hover .MuiOutlinedInput-notchedOutline': {
+                              borderColor: 'rgba(255,255,255,0.3)'
+                            },
+                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                              borderColor: '#ff5722'
+                            },
+                            '& .MuiSelect-icon': {
+                              color: 'white'
+                            }
+                          }}
+                        >
+                          <MenuItem value="">
+                            <em>Žádný řešitel</em>
+                          </MenuItem>
+                          {users.map((user) => (
+                            <MenuItem key={user.uid} value={user.uid}>
+                              {user.displayName || user.email}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    )}
+                  />
+                </Box>
               </Box>
               
               <Box sx={{ display: 'flex', gap: 2 }}>

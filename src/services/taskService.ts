@@ -16,6 +16,7 @@ import {
   DocumentData,
   QueryDocumentSnapshot
 } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
 import { db } from '../firebase/config';
 import { 
   Task, 
@@ -36,31 +37,56 @@ const HISTORY_COLLECTION = 'history';
 const convertToTask = (doc: QueryDocumentSnapshot<DocumentData>): Task => {
   const data = doc.data();
   
+  // Безопасное преобразование Timestamp в Date
+  const safeToDate = (timestamp: any) => {
+    if (!timestamp) return new Date();
+    try {
+      if (timestamp.toDate && typeof timestamp.toDate === 'function') {
+        return timestamp.toDate();
+      }
+      return new Date(timestamp);
+    } catch (error) {
+      console.error('Error converting timestamp to date:', error);
+      return new Date();
+    }
+  };
+  
   return {
     id: doc.id,
-    title: data.title,
-    description: data.description,
-    assignee: data.assignee,
-    priority: data.priority,
-    status: data.status,
-    project: data.project,
-    deadline: data.deadline.toDate(),
-    estimatedTime: data.estimatedTime,
+    title: data.title || '',
+    description: data.description || '',
+    assignee: data.assignee || '',
+    priority: data.priority || 'medium',
+    status: data.status || 'new',
+    project: data.project || '',
+    deadline: safeToDate(data.deadline),
+    estimatedTime: data.estimatedTime || 0,
     tags: data.tags || [],
     attachments: data.attachments || [],
     comments: data.comments || [],
     history: data.history || [],
-    createdBy: data.createdBy,
-    createdAt: data.createdAt.toDate(),
-    updatedAt: data.updatedAt.toDate(),
+    createdBy: data.createdBy || '',
+    createdAt: safeToDate(data.createdAt),
+    updatedAt: safeToDate(data.updatedAt),
     progress: data.progress || 0,
-    actualTime: data.actualTime
+    actualTime: data.actualTime || 0
   };
 };
 
 // Get all tasks with filtering, sorting, and pagination
 export const getTasks = async (options?: TaskListOptions): Promise<{ tasks: Task[], lastDoc: QueryDocumentSnapshot | null }> => {
   try {
+    // Проверка аутентификации
+    const auth = getAuth();
+    const currentUser = auth.currentUser;
+    
+    if (!currentUser) {
+      console.error('User not authenticated');
+      return { tasks: [], lastDoc: null };
+    }
+    
+    console.log('Fetching tasks for user:', currentUser.uid);
+    
     const collectionRef = collection(db, TASKS_COLLECTION);
     let queryConstraints = [];
 
@@ -103,9 +129,6 @@ export const getTasks = async (options?: TaskListOptions): Promise<{ tasks: Task
           queryConstraints.push(where('deadline', '<=', Timestamp.fromDate(filters.deadline.to)));
         }
       }
-      
-      // Note: text search would require Firestore indexes or a more complex solution
-      // like Algolia or Elasticsearch for production apps
     }
     
     // Apply sorting
@@ -124,22 +147,34 @@ export const getTasks = async (options?: TaskListOptions): Promise<{ tasks: Task
     // Create the query with all constraints
     const queryWithConstraints = query(collectionRef, ...queryConstraints);
     
+    console.log('Executing tasks query...');
+    
     // Execute the query
     const querySnapshot = await getDocs(queryWithConstraints);
+    
+    console.log(`Got ${querySnapshot.size} tasks from Firestore`);
     
     // Convert the documents to Task objects
     const tasks: Task[] = [];
     let lastDoc: QueryDocumentSnapshot | null = null;
     
     querySnapshot.forEach((doc) => {
-      tasks.push(convertToTask(doc));
-      lastDoc = doc;
+      try {
+        const task = convertToTask(doc);
+        tasks.push(task);
+        lastDoc = doc;
+      } catch (err) {
+        console.error(`Error converting task document ${doc.id}:`, err);
+      }
     });
+    
+    console.log(`Successfully converted ${tasks.length} tasks`);
     
     return { tasks, lastDoc };
   } catch (error) {
     console.error('Error getting tasks:', error);
-    throw error;
+    // Возвращаем пустой массив вместо выбрасывания ошибки
+    return { tasks: [], lastDoc: null };
   }
 };
 
@@ -162,27 +197,70 @@ export const getTaskById = async (taskId: string): Promise<Task | null> => {
 // Create a new task
 export const createTask = async (taskData: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'history'>): Promise<Task> => {
   try {
+    // Проверка аутентификации
+    const auth = getAuth();
+    const currentUser = auth.currentUser;
+    
+    if (!currentUser) {
+      console.error('User not authenticated');
+      throw new Error('User not authenticated');
+    }
+    
+    console.log('Creating task for user:', currentUser.uid);
+    console.log('Task data:', JSON.stringify(taskData, null, 2));
+    
+    // Убедимся, что deadline правильно преобразуется в Timestamp
+    let deadlineTimestamp;
+    if (taskData.deadline) {
+      if (typeof taskData.deadline === 'object' && 'toDate' in taskData.deadline && typeof taskData.deadline.toDate === 'function') {
+        // Это уже Timestamp
+        deadlineTimestamp = taskData.deadline;
+      } else if (taskData.deadline instanceof Date) {
+        deadlineTimestamp = Timestamp.fromDate(taskData.deadline);
+      } else if (typeof taskData.deadline === 'string') {
+        deadlineTimestamp = Timestamp.fromDate(new Date(taskData.deadline));
+      } else {
+        // Если не удалось определить тип, используем текущую дату
+        console.warn('Unknown deadline type, using current date');
+        deadlineTimestamp = Timestamp.fromDate(new Date());
+      }
+    } else {
+      // Если deadline не указан, используем текущую дату
+      console.warn('No deadline provided, using current date');
+      deadlineTimestamp = Timestamp.fromDate(new Date());
+    }
+    
     const now = serverTimestamp();
     
+    // Создаем новый объект задачи без поля deadline из исходных данных
+    const { deadline: _, ...taskDataWithoutDeadline } = taskData;
+    
     const newTaskData = {
-      ...taskData,
+      ...taskDataWithoutDeadline,
+      deadline: deadlineTimestamp,
       createdAt: now,
       updatedAt: now,
+      createdBy: currentUser.uid,
       history: [],
       comments: [],
       attachments: []
     };
     
+    console.log('Saving task to Firestore...');
     const docRef = await addDoc(collection(db, TASKS_COLLECTION), newTaskData);
+    console.log('Task created with ID:', docRef.id);
     
-    // Get the created task
+    // Get the newly created document to return it
     const taskDoc = await getDoc(docRef);
     
     if (!taskDoc.exists()) {
       throw new Error('Failed to create task');
     }
     
-    return convertToTask(taskDoc as QueryDocumentSnapshot<DocumentData>);
+    const createdTask = convertToTask(taskDoc as QueryDocumentSnapshot<DocumentData>);
+    console.log('Created task:', createdTask);
+    
+    return createdTask;
   } catch (error) {
     console.error('Error creating task:', error);
     throw error;

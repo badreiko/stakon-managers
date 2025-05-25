@@ -29,7 +29,9 @@ import {
   Add as AddIcon,
   FilterList as FilterListIcon
 } from '@mui/icons-material';
-import { DragDropContext, Droppable, Draggable, DropResult, DroppableProvided, DraggableProvided, DroppableStateSnapshot, DraggableStateSnapshot } from 'react-beautiful-dnd';
+import { DndContext, DragOverlay, closestCorners, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent, DragStartEvent } from '@dnd-kit/core';
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { useTranslation } from 'react-i18next';
 import { format } from 'date-fns';
 import { cs } from 'date-fns/locale';
@@ -39,7 +41,7 @@ import { User } from '../../types/user.types';
 import { Project } from '../../types/project.types';
 import { getTasks, updateTaskStatus } from '../../services/taskService';
 import { getUsers } from '../../services/userService';
-import { getActiveProjects } from '../../services/projectService';
+import { getActiveProjects, getAllProjects } from '../../services/projectService';
 import TaskForm from './TaskForm';
 import { STATUS_COLORS, PRIORITY_COLORS } from '../../theme/theme';
 
@@ -51,6 +53,222 @@ const columns: { id: TaskStatus; title: string; color: string }[] = [
   { id: 'done', title: 'tasks.kanban.done', color: STATUS_COLORS.done },
   { id: 'cancelled', title: 'tasks.kanban.cancelled', color: STATUS_COLORS.cancelled }
 ];
+
+// Sortable task item component
+interface SortableTaskItemProps {
+  task: Task;
+  getUserById: (userId: string) => User | undefined;
+  getProjectById: (projectId: string) => Project | undefined;
+  getPriorityColor: (priority: string) => string;
+  handleMenuOpen: (event: React.MouseEvent<HTMLElement>, task: Task) => void;
+  setSelectedTask: (task: Task) => void;
+  setTaskFormOpen: (open: boolean) => void;
+}
+
+const SortableTaskItem = ({ 
+  task, 
+  getUserById, 
+  getProjectById, 
+  getPriorityColor, 
+  handleMenuOpen, 
+  setSelectedTask, 
+  setTaskFormOpen 
+}: SortableTaskItemProps) => {
+  const { t } = useTranslation();
+  
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({ id: task.id });
+  
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 1000 : 1
+  };
+  
+  return (
+    <Card
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      sx={{
+        mb: 2,
+        borderLeft: 4,
+        borderColor: getPriorityColor(task.priority),
+        boxShadow: isDragging ? 8 : 1,
+        '&:hover': {
+          boxShadow: 3
+        }
+      }}
+      style={style}
+      onClick={() => {
+        setSelectedTask(task);
+        setTaskFormOpen(true);
+      }}
+    >
+      <CardContent sx={{ pb: 1, '&:last-child': { pb: 1 } }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+          <Chip 
+            label={t(`tasks.priorities.${task.priority}`)} 
+            size="small" 
+            sx={{ 
+              bgcolor: `${getPriorityColor(task.priority)}20`,
+              color: getPriorityColor(task.priority),
+              fontWeight: 'bold'
+            }} 
+          />
+          <IconButton 
+            size="small" 
+            onClick={(e: React.MouseEvent<HTMLElement>) => {
+              e.stopPropagation();
+              handleMenuOpen(e, task);
+            }}
+          >
+            <MoreVertIcon fontSize="small" />
+          </IconButton>
+        </Box>
+        
+        <Typography variant="subtitle1" fontWeight="bold" gutterBottom noWrap>
+          {task.title}
+        </Typography>
+        
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+          {task.assignee && getUserById(task.assignee) && (
+            <Tooltip title={getUserById(task.assignee)?.displayName || ''}>
+              <Avatar 
+                src={getUserById(task.assignee)?.photoURL} 
+                alt={getUserById(task.assignee)?.displayName}
+                sx={{ width: 24, height: 24, mr: 1 }}
+              >
+                {getUserById(task.assignee)?.displayName?.charAt(0)}
+              </Avatar>
+            </Tooltip>
+          )}
+          
+          <Typography variant="body2" color="text.secondary" noWrap>
+            {task.project && getProjectById(task.project)?.name}
+          </Typography>
+        </Box>
+        
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <Tooltip title={t('tasks.deadline')}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mr: 1 }}>
+                <CalendarIcon fontSize="small" color="action" sx={{ mr: 0.5 }} />
+                <Typography variant="caption">
+                  {format(new Date(task.deadline), 'dd.MM.yyyy')}
+                </Typography>
+              </Box>
+            </Tooltip>
+          </Box>
+          
+          <Box sx={{ display: 'flex' }}>
+            {task.comments.length > 0 && (
+              <Badge badgeContent={task.comments.length} color="primary" sx={{ mr: 1 }}>
+                <CommentIcon fontSize="small" color="action" />
+              </Badge>
+            )}
+            
+            {task.attachments.length > 0 && (
+              <Badge badgeContent={task.attachments.length} color="secondary">
+                <AttachmentIcon fontSize="small" color="action" />
+              </Badge>
+            )}
+          </Box>
+        </Box>
+        
+        {task.tags.length > 0 && (
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 1 }}>
+            {task.tags.slice(0, 3).map((tag) => (
+              <Chip 
+                key={tag} 
+                label={tag} 
+                size="small" 
+                sx={{ height: 20, fontSize: '0.7rem' }} 
+              />
+            ))}
+            {task.tags.length > 3 && (
+              <Chip 
+                label={`+${task.tags.length - 3}`} 
+                size="small" 
+                sx={{ height: 20, fontSize: '0.7rem' }} 
+              />
+            )}
+          </Box>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+// Column component
+interface ColumnProps {
+  column: { id: TaskStatus; title: string; color: string };
+  tasks: Task[];
+  getUserById: (userId: string) => User | undefined;
+  getProjectById: (projectId: string) => Project | undefined;
+  getPriorityColor: (priority: string) => string;
+  handleMenuOpen: (event: React.MouseEvent<HTMLElement>, task: Task) => void;
+  setSelectedTask: (task: Task) => void;
+  setTaskFormOpen: (open: boolean) => void;
+}
+
+const Column = ({ 
+  column, 
+  tasks, 
+  getUserById, 
+  getProjectById, 
+  getPriorityColor, 
+  handleMenuOpen, 
+  setSelectedTask, 
+  setTaskFormOpen 
+}: ColumnProps) => {
+  const { t } = useTranslation();
+  
+  return (
+    <Paper
+      sx={{
+        bgcolor: column.color,
+        p: 2,
+        height: '100%',
+        overflowY: 'auto',
+        transition: 'background-color 0.2s ease',
+      }}
+    >
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Typography variant="h6" fontWeight="bold">
+          {t(column.title)}
+        </Typography>
+        <Chip 
+          label={tasks.length} 
+          size="small" 
+          sx={{ bgcolor: 'white' }} 
+        />
+      </Box>
+      
+      <SortableContext items={tasks.map(task => task.id)} strategy={verticalListSortingStrategy}>
+        {tasks.map((task) => (
+          <SortableTaskItem
+            key={task.id}
+            task={task}
+            getUserById={getUserById}
+            getProjectById={getProjectById}
+            getPriorityColor={getPriorityColor}
+            handleMenuOpen={handleMenuOpen}
+            setSelectedTask={setSelectedTask}
+            setTaskFormOpen={setTaskFormOpen}
+          />
+        ))}
+      </SortableContext>
+    </Paper>
+  );
+};
 
 // Get priority color
 const getPriorityColor = (priority: string) => {
@@ -90,15 +308,24 @@ const KanbanBoard: React.FC = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
+        // Используем тот же подход, что и в Dashboard
         const { tasks: fetchedTasks } = await getTasks();
         const fetchedUsers = await getUsers();
-        const fetchedProjects = await getActiveProjects();
+        const fetchedProjects = await getAllProjects(); // Используем getAllProjects вместо getActiveProjects
+        
+        console.log('KanbanBoard: Загружено задач:', fetchedTasks.length);
+        console.log('KanbanBoard: Загружено пользователей:', fetchedUsers.length);
+        console.log('KanbanBoard: Загружено проектов:', fetchedProjects.length);
         
         setTasks(fetchedTasks);
         setUsers(fetchedUsers);
         setProjects(fetchedProjects);
       } catch (error) {
-        console.error('Error fetching data:', error);
+        console.error('KanbanBoard: Ошибка загрузки данных:', error);
+        // Устанавливаем пустые массивы в случае ошибки
+        setTasks([]);
+        setUsers([]);
+        setProjects([]);
       } finally {
         setLoading(false);
       }
@@ -161,37 +388,58 @@ const KanbanBoard: React.FC = () => {
     fetchTasks();
   };
 
-  // Handle drag and drop
-  const handleDragEnd = async (result: DropResult) => {
-    const { destination, source, draggableId } = result;
-
-    // If there's no destination or the item is dropped in the same place
-    if (!destination || 
-        (destination.droppableId === source.droppableId && 
-         destination.index === source.index)) {
-      return;
-    }
-
-    // Find the task that was dragged
-    const task = tasks.find(t => t.id === draggableId);
-    if (!task || !currentUser) return;
-
-    // Update the task status
-    const newStatus = destination.droppableId as TaskStatus;
+  // State for drag and drop
+  const [activeId, setActiveId] = useState<string | null>(null);
+  
+  // Setup sensors for drag and drop
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+  
+  // Handle drag start
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id.toString());
+  };
+  
+  // Handle drag end
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveId(null);
     
-    // Optimistically update the UI
-    const updatedTasks = tasks.map(t => 
-      t.id === draggableId ? { ...t, status: newStatus } : t
-    );
-    setTasks(updatedTasks);
-
+    if (!over) return;
+    
+    const taskId = active.id.toString();
+    const overId = over.id.toString();
+    
+    // If the task is not dropped on a column, ignore
+    if (!overId.startsWith('column-')) return;
+    
+    // Extract the column status from the over ID (format: 'column-{status}')
+    const newStatus = overId.replace('column-', '') as TaskStatus;
+    
+    // Find the task
+    const task = tasks.find(t => t.id === taskId);
+    if (!task || task.status === newStatus || !currentUser) return;
+    
     try {
-      // Update the task in the database
-      await updateTaskStatus(draggableId, newStatus, currentUser.uid);
+      // Optimistically update the UI
+      setTasks(tasks.map(t => 
+        t.id === taskId ? { ...t, status: newStatus } : t
+      ));
+      
+      // Update in the database
+      await updateTaskStatus(taskId, newStatus, currentUser.uid);
     } catch (error) {
       console.error('Error updating task status:', error);
       // Revert the UI if there's an error
-      setTasks(tasks);
+      setTasks([...tasks]);
     }
   };
 
@@ -358,7 +606,12 @@ const KanbanBoard: React.FC = () => {
           <CircularProgress />
         </Box>
       ) : (
-        <DragDropContext onDragEnd={handleDragEnd}>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCorners}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
           <Box
             sx={{
               display: 'grid',
@@ -370,153 +623,79 @@ const KanbanBoard: React.FC = () => {
             }}
           >
             {columns.map((column) => (
-              <Droppable key={column.id} droppableId={column.id}>
-                {(provided: DroppableProvided, snapshot: DroppableStateSnapshot) => (
-                  <Paper
-                    ref={provided.innerRef}
-                    {...provided.droppableProps}
-                    sx={{
-                      bgcolor: column.color,
-                      p: 2,
-                      height: '100%',
-                      overflowY: 'auto',
-                      transition: 'background-color 0.2s ease',
-                      ...(snapshot.isDraggingOver && {
-                        bgcolor: `${column.color}80` // Add transparency when dragging over
-                      })
-                    }}
-                  >
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                      <Typography variant="h6" fontWeight="bold">
-                        {t(column.title)}
-                      </Typography>
+              <div key={`column-${column.id}`} id={`column-${column.id}`}>
+                <Column
+                  column={column}
+                  tasks={groupedTasks[column.id]}
+                  getUserById={getUserById}
+                  getProjectById={getProjectById}
+                  getPriorityColor={getPriorityColor}
+                  handleMenuOpen={handleMenuOpen}
+                  setSelectedTask={setSelectedTask}
+                  setTaskFormOpen={setTaskFormOpen}
+                />
+              </div>
+            ))}
+          </Box>
+          
+          {/* Drag overlay for the currently dragged task */}
+          <DragOverlay>
+            {activeId && (() => {
+              const task = tasks.find(t => t.id === activeId);
+              if (!task) return null;
+              
+              return (
+                <Card
+                  sx={{
+                    mb: 2,
+                    borderLeft: 4,
+                    borderColor: getPriorityColor(task.priority),
+                    boxShadow: 8,
+                    opacity: 0.8,
+                    width: '100%'
+                  }}
+                >
+                  <CardContent sx={{ pb: 1, '&:last-child': { pb: 1 } }}>
+                    <Typography variant="subtitle1" fontWeight="bold" gutterBottom noWrap>
+                      {task.title}
+                    </Typography>
+                    
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                      {task.assignee && getUserById(task.assignee) && (
+                        <Avatar 
+                          src={getUserById(task.assignee)?.photoURL} 
+                          alt={getUserById(task.assignee)?.displayName}
+                          sx={{ width: 24, height: 24, mr: 1 }}
+                        >
+                          {getUserById(task.assignee)?.displayName?.charAt(0)}
+                        </Avatar>
+                      )}
+                      
                       <Chip 
-                        label={groupedTasks[column.id].length} 
+                        label={t(`tasks.priorities.${task.priority}`)} 
                         size="small" 
-                        sx={{ bgcolor: 'white' }} 
+                        sx={{ 
+                          bgcolor: `${getPriorityColor(task.priority)}20`,
+                          color: getPriorityColor(task.priority),
+                          fontWeight: 'bold'
+                        }} 
                       />
                     </Box>
                     
-                    {groupedTasks[column.id].map((task, index) => (
-                      <Draggable key={task.id} draggableId={task.id} index={index}>
-                        {(provided: DraggableProvided, snapshot: DraggableStateSnapshot) => (
-                          <Card
-                            ref={provided.innerRef}
-                            {...provided.draggableProps}
-                            {...provided.dragHandleProps}
-                            sx={{
-                              mb: 2,
-                              borderLeft: 4,
-                              borderColor: getPriorityColor(task.priority),
-                              boxShadow: snapshot.isDragging ? 8 : 1,
-                              '&:hover': {
-                                boxShadow: 3
-                              }
-                            }}
-                            onClick={() => {
-                              setSelectedTask(task);
-                              setTaskFormOpen(true);
-                            }}
-                          >
-                            <CardContent sx={{ pb: 1, '&:last-child': { pb: 1 } }}>
-                              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                                <Chip 
-                                  label={t(`tasks.priorities.${task.priority}`)} 
-                                  size="small" 
-                                  sx={{ 
-                                    bgcolor: `${getPriorityColor(task.priority)}20`,
-                                    color: getPriorityColor(task.priority),
-                                    fontWeight: 'bold'
-                                  }} 
-                                />
-                                <IconButton 
-                                  size="small" 
-                                  onClick={(e: React.MouseEvent<HTMLElement>) => handleMenuOpen(e, task)}
-                                >
-                                  <MoreVertIcon fontSize="small" />
-                                </IconButton>
-                              </Box>
-                              
-                              <Typography variant="subtitle1" fontWeight="bold" gutterBottom noWrap>
-                                {task.title}
-                              </Typography>
-                              
-                              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                                {task.assignee && getUserById(task.assignee) && (
-                                  <Tooltip title={getUserById(task.assignee)?.displayName || ''}>
-                                    <Avatar 
-                                      src={getUserById(task.assignee)?.photoURL} 
-                                      alt={getUserById(task.assignee)?.displayName}
-                                      sx={{ width: 24, height: 24, mr: 1 }}
-                                    >
-                                      {getUserById(task.assignee)?.displayName.charAt(0)}
-                                    </Avatar>
-                                  </Tooltip>
-                                )}
-                                
-                                <Typography variant="body2" color="text.secondary" noWrap>
-                                  {task.project && getProjectById(task.project)?.name}
-                                </Typography>
-                              </Box>
-                              
-                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                  <Tooltip title={t('tasks.deadline')}>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', mr: 1 }}>
-                                      <CalendarIcon fontSize="small" color="action" sx={{ mr: 0.5 }} />
-                                      <Typography variant="caption">
-                                        {format(new Date(task.deadline), 'dd.MM.yyyy')}
-                                      </Typography>
-                                    </Box>
-                                  </Tooltip>
-                                </Box>
-                                
-                                <Box sx={{ display: 'flex' }}>
-                                  {task.comments.length > 0 && (
-                                    <Badge badgeContent={task.comments.length} color="primary" sx={{ mr: 1 }}>
-                                      <CommentIcon fontSize="small" color="action" />
-                                    </Badge>
-                                  )}
-                                  
-                                  {task.attachments.length > 0 && (
-                                    <Badge badgeContent={task.attachments.length} color="secondary">
-                                      <AttachmentIcon fontSize="small" color="action" />
-                                    </Badge>
-                                  )}
-                                </Box>
-                              </Box>
-                              
-                              {task.tags.length > 0 && (
-                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 1 }}>
-                                  {task.tags.slice(0, 3).map((tag) => (
-                                    <Chip 
-                                      key={tag} 
-                                      label={tag} 
-                                      size="small" 
-                                      sx={{ height: 20, fontSize: '0.7rem' }} 
-                                    />
-                                  ))}
-                                  {task.tags.length > 3 && (
-                                    <Chip 
-                                      label={`+${task.tags.length - 3}`} 
-                                      size="small" 
-                                      sx={{ height: 20, fontSize: '0.7rem' }} 
-                                    />
-                                  )}
-                                </Box>
-                              )}
-                            </CardContent>
-                          </Card>
-                        )}
-                      </Draggable>
-                    ))}
-                    {provided.placeholder}
-                  </Paper>
-                )}
-              </Droppable>
-            ))}
-          </Box>
-        </DragDropContext>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', mr: 1 }}>
+                        <CalendarIcon fontSize="small" color="action" sx={{ mr: 0.5 }} />
+                        <Typography variant="caption">
+                          {format(new Date(task.deadline), 'dd.MM.yyyy')}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </CardContent>
+                </Card>
+              );
+            })()}
+          </DragOverlay>
+        </DndContext>
       )}
       
       {/* Task menu */}

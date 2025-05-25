@@ -195,13 +195,24 @@
     "title": "Přehled",
     "activeTasks": "Aktivní úkoly",
     "overdueTasks": "Po termínu",
-    "todayTasks": "Dnešní úkoly",
+    "todayTasks": "Dnes",
     "completedThisWeek": "Dokončeno tento týden",
-    "tasksByStatus": "Úkoly podle statusu",
-    "tasksByPriority": "Úkoly podle priority",
-    "tasksByAssignee": "Úkoly podle řešitele",
     "upcomingDeadlines": "Nadcházející termíny",
-    "recentActivity": "Nedávná aktivita"
+    "recentActivity": "Nedávná aktivita",
+    "tasksByStatus": "Úkoly podle statusu",
+    "tasksByAssignee": "Úkoly podle řešitele"
+  },
+  "filters": {
+    "title": "Filtry",
+    "assignee": "Řešitel",
+    "priority": "Priorita",
+    "deadline": "Termín",
+    "status": "Status",
+    "project": "Projekt",
+    "tags": "Štítky",
+    "dateRange": "Časové období",
+    "applyFilters": "Použít filtry",
+    "clearFilters": "Vymazat filtry"
   },
   "reports": {
     "title": "Přehledy",
@@ -241,6 +252,18 @@
       "inApp": "V aplikaci",
       "push": "Push"
     }
+  },
+  "notifications": {
+    "title": "Oznámení",
+    "markAllAsRead": "Označit vše jako přečtené",
+    "markAsRead": "Označit jako přečtené",
+    "noNotifications": "Žádná oznámení",
+    "newTask": "Nový úkol",
+    "taskUpdate": "Aktualizace úkolu",
+    "deadline": "Termín",
+    "mention": "Zmínka",
+    "today": "Dnes",
+    "yesterday": "Včera"
   },
   "status": {
     "new": "vytvořil nový úkol",

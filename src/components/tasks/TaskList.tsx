@@ -41,7 +41,7 @@ import { User } from '../../types/user.types';
 import { Project } from '../../types/project.types';
 import { getTasks, updateTaskStatus, updateTaskAssignee, deleteTask } from '../../services/taskService';
 import { getUsers } from '../../services/userService';
-import { getActiveProjects } from '../../services/projectService';
+import { getActiveProjects, getAllProjects } from '../../services/projectService';
 import TaskForm from './TaskForm';
 import { STATUS_COLORS, PRIORITY_COLORS } from '../../theme/theme';
 
@@ -102,15 +102,24 @@ const TaskList: React.FC = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
+        // Используем тот же подход, что и в Dashboard
         const { tasks: fetchedTasks } = await getTasks();
         const fetchedUsers = await getUsers();
-        const fetchedProjects = await getActiveProjects();
+        const fetchedProjects = await getAllProjects(); // Используем getAllProjects вместо getActiveProjects
+        
+        console.log('TaskList: Загружено задач:', fetchedTasks.length);
+        console.log('TaskList: Загружено пользователей:', fetchedUsers.length);
+        console.log('TaskList: Загружено проектов:', fetchedProjects.length);
         
         setTasks(fetchedTasks);
         setUsers(fetchedUsers);
         setProjects(fetchedProjects);
       } catch (error) {
-        console.error('Error fetching data:', error);
+        console.error('TaskList: Ошибка загрузки данных:', error);
+        // Устанавливаем пустые массивы в случае ошибки
+        setTasks([]);
+        setUsers([]);
+        setProjects([]);
       } finally {
         setLoading(false);
       }
@@ -397,8 +406,14 @@ const TaskList: React.FC = () => {
       field: 'deadline',
       headerName: t('tasks.deadline'),
       width: 150,
-      valueFormatter: (params: GridValueFormatterParams<Date>) => {
-        return format(params.value, 'dd.MM.yyyy');
+      valueFormatter: (params: GridValueFormatterParams<any>) => {
+        if (!params.value) return '';
+        try {
+          return format(new Date(params.value), 'dd.MM.yyyy');
+        } catch (error) {
+          console.error('Error formatting date:', error);
+          return params.value?.toString() || '';
+        }
       },
       sortable: true
     },

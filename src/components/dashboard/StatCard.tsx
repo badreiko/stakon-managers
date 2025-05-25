@@ -14,28 +14,36 @@ interface StatCardProps {
 const StatCard: React.FC<StatCardProps> = ({ title, value, icon, color = 'primary.main', sx }) => {
   return (
     <Card 
-      elevation={2} 
+      elevation={1} 
       sx={{ 
-        height: '100%',
+        height: '40px',
         display: 'flex',
-        flexDirection: 'column',
-        borderLeft: 4,
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderLeft: 3,
         borderColor: color,
+        borderRadius: 1,
+        transition: 'transform 0.2s, box-shadow 0.2s',
+        '&:hover': {
+          transform: 'translateY(-1px)',
+          boxShadow: 2,
+        },
+        width: '100%',
         ...sx
       }}
     >
-      <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
-        <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
-          <Typography variant="subtitle2" color="text.secondary">
+      <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'row', alignItems: 'center', p: 1, py: 0.5, '&:last-child': { pb: 0.5 } }}>
+        <Box sx={{ color, backgroundColor: `${color}15`, borderRadius: '50%', p: 0.5, display: 'flex', alignItems: 'center', justifyContent: 'center', mr: 1.5, width: 24, height: 24, minWidth: 24 }}>
+          {icon}
+        </Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem', lineHeight: 1 }}>
             {title}
           </Typography>
-          <Box sx={{ color }}>
-            {icon}
-          </Box>
+          <Typography variant="body1" component="div" fontWeight="bold" sx={{ ml: 1 }}>
+            {value}
+          </Typography>
         </Box>
-        <Typography variant="h4" component="div" fontWeight="bold" mt={1}>
-          {value}
-        </Typography>
       </CardContent>
     </Card>
   );

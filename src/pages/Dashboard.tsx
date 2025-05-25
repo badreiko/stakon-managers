@@ -27,7 +27,9 @@ import { format } from 'date-fns';
 import StatCard from '../components/dashboard/StatCard';
 import { STATUS_COLORS, PRIORITY_COLORS } from '../theme/theme';
 import { getTasks } from '../services/taskService';
+import { getUsers } from '../services/userService';
 import { Task, TaskStatus } from '../types/task.types';
+import { User } from '../types/user.types';
 import { useAuth } from '../context/AuthContext';
 
 const Dashboard: React.FC = () => {
@@ -36,23 +38,36 @@ const Dashboard: React.FC = () => {
   const { currentUser } = useAuth();
   const [loading, setLoading] = useState(true);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   
-  // Fetch tasks from Firestore
+  // Fetch tasks and users from Firestore
   useEffect(() => {
-    const fetchTasks = async () => {
+    const fetchData = async () => {
       setLoading(true);
       try {
+        // Fetch tasks
         const { tasks: fetchedTasks } = await getTasks();
         setTasks(fetchedTasks);
+        
+        // Fetch users
+        const fetchedUsers = await getUsers();
+        setUsers(fetchedUsers);
       } catch (error) {
-        console.error('Error fetching tasks:', error);
+        console.error('Error fetching data:', error);
       } finally {
         setLoading(false);
       }
     };
     
-    fetchTasks();
+    fetchData();
   }, []);
+  
+  // Функция для получения имени пользователя по ID
+  const getUserNameById = (userId: string): string => {
+    if (!userId) return 'Не назначено';
+    const user = users.find(u => u.uid === userId);
+    return user ? (user.displayName || user.email) : userId;
+  };
   
   // Calculate dashboard statistics
   const today = new Date();
@@ -129,227 +144,368 @@ const Dashboard: React.FC = () => {
         {t('dashboard.title')}
       </Typography>
 
-      {/* Statistics Cards */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} sm={6} md={3}>
-          <StatCard 
-            title={t('dashboard.activeTasks')} 
-            value={stats.activeTasks} 
-            icon={<TaskIcon />} 
-            color={PRIORITY_COLORS.medium}
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <StatCard 
-            title={t('dashboard.overdueTasks')} 
-            value={stats.overdueTasks} 
-            icon={<OverdueIcon />} 
-            color={PRIORITY_COLORS.critical}
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <StatCard 
-            title={t('dashboard.todayTasks')} 
-            value={stats.todayTasks} 
-            icon={<TodayIcon />} 
-            color={PRIORITY_COLORS.high}
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <StatCard 
-            title={t('dashboard.completedThisWeek')} 
-            value={stats.completedThisWeek} 
-            icon={<CompletedIcon />} 
-            color="#4CAF50"
-          />
-        </Grid>
-      </Grid>
+      {/* Statistics Cards - Уменьшенные по высоте */}
+      <Box sx={{ mb: 3, display: 'flex', gap: 2 }}>
+        <StatCard 
+          title={t('dashboard.activeTasks')} 
+          value={stats.activeTasks} 
+          icon={<TaskIcon fontSize="small" />} 
+          color={PRIORITY_COLORS.medium}
+          sx={{ flex: 1 }}
+        />
+        <StatCard 
+          title={t('dashboard.overdueTasks')} 
+          value={stats.overdueTasks} 
+          icon={<OverdueIcon fontSize="small" />} 
+          color={PRIORITY_COLORS.critical}
+          sx={{ flex: 1 }}
+        />
+        <StatCard 
+          title={t('dashboard.todayTasks')} 
+          value={stats.todayTasks} 
+          icon={<TodayIcon fontSize="small" />} 
+          color={PRIORITY_COLORS.high}
+          sx={{ flex: 1 }}
+        />
+        <StatCard 
+          title={t('dashboard.completedThisWeek')} 
+          value={stats.completedThisWeek} 
+          icon={<CompletedIcon fontSize="small" />} 
+          color="#4CAF50"
+          sx={{ flex: 1 }}
+        />
+      </Box>
 
       {/* Main Content */}
-      <Grid container spacing={3}>
-        {/* Left Column */}
-        <Grid item xs={12} md={8}>
-          <Card sx={{ mb: 3 }}>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
+      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 3 }}>
+        {/* Left Column - Nadcházející termíny в виде стикеров */}
+        <Box sx={{ flex: { md: '1 1 70%' } }}>
+          <Card 
+            sx={{ 
+              height: '100%',
+              borderRadius: 2, 
+              boxShadow: 3, 
+              overflow: 'hidden',
+              backgroundImage: (theme: any) => theme.palette.mode === 'dark' 
+                ? 'linear-gradient(rgba(30, 30, 30, 0.9), rgba(30, 30, 30, 0.9)), url("/cork-board.png")' 
+                : 'linear-gradient(rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.9)), url("/cork-board.png")',
+              backgroundSize: 'cover',
+              p: 2
+            }}
+          >
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="h6" fontWeight="bold" color="text.primary">
                 {t('dashboard.upcomingDeadlines')}
               </Typography>
-              <List>
-                {upcomingDeadlines.map((deadline, index) => (
-                  <React.Fragment key={deadline.id}>
-                    <ListItem alignItems="flex-start">
-                      <ListItemAvatar>
-                        <Avatar sx={{ bgcolor: getPriorityColor(deadline.priority) }}>
-                          <TaskIcon />
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary={
-                          <Box display="flex" justifyContent="space-between" alignItems="center">
-                            <Typography variant="subtitle1" component="span">
-                              {deadline.title}
-                            </Typography>
-                            <Chip 
-                              icon={<CalendarIcon fontSize="small" />} 
-                              label={deadline.deadline} 
-                              size="small" 
-                              variant="outlined"
-                            />
-                          </Box>
-                        }
-                        secondary={
-                          <Box display="flex" alignItems="center" mt={0.5}>
-                            <PersonIcon fontSize="small" sx={{ mr: 0.5, fontSize: 16 }} />
-                            <Typography variant="body2" component="span" color="text.secondary">
-                              {deadline.assignee}
-                            </Typography>
-                            <Chip 
-                              label={t(`tasks.priorities.${deadline.priority}`)} 
-                              size="small" 
-                              sx={{ 
-                                ml: 1, 
-                                bgcolor: getPriorityColor(deadline.priority) + '20',
-                                color: getPriorityColor(deadline.priority),
-                                fontSize: '0.7rem',
-                                height: 20
-                              }} 
-                            />
-                          </Box>
-                        }
-                      />
-                    </ListItem>
-                    {index < upcomingDeadlines.length - 1 && <Divider variant="inset" component="li" />}
-                  </React.Fragment>
-                ))}
-              </List>
-            </CardContent>
-          </Card>
-
-          {/* Task Status Chart */}
-          <Paper sx={{ p: 3, mb: 3 }}>
-            <Typography variant="h6" gutterBottom>
-              {t('dashboard.tasksByStatus')}
-            </Typography>
-            <Box sx={{ display: 'flex', justifyContent: 'space-around', mt: 2 }}>
-              {/* Подсчет задач по статусам */}
-              {[
-                { status: 'new' as TaskStatus, label: t('tasks.statuses.new') },
-                { status: 'inProgress' as TaskStatus, label: t('tasks.statuses.inProgress') },
-                { status: 'review' as TaskStatus, label: t('tasks.statuses.review') },
-                { status: 'done' as TaskStatus, label: t('tasks.statuses.done') },
-                { status: 'cancelled' as TaskStatus, label: t('tasks.statuses.cancelled') }
-              ].map(statusItem => {
-                const count = tasks.filter(task => task.status === statusItem.status).length;
-                // Высота столбца зависит от количества задач
-                const height = count === 0 ? 20 : Math.min(40 + count * 20, 200);
-                
-                return (
-                  <Box key={statusItem.status} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                    <Box sx={{ 
-                      height, 
-                      width: 40, 
-                      bgcolor: STATUS_COLORS[statusItem.status], 
-                      mb: 1, 
-                      borderRadius: 1 
-                    }} />
-                    <Typography variant="body2">{statusItem.label}</Typography>
-                    <Typography variant="subtitle2">{count}</Typography>
-                  </Box>
-                );
-              })}
+              
+              {/* Фильтры в виде пиктограмм */}
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <Chip 
+                  icon={<PersonIcon fontSize="small" />} 
+                  label={t('filters.assignee')} 
+                  size="small" 
+                  variant="outlined"
+                  onClick={() => {}}
+                />
+                <Chip 
+                  icon={<OverdueIcon fontSize="small" />} 
+                  label={t('filters.priority')} 
+                  size="small" 
+                  variant="outlined"
+                  onClick={() => {}}
+                />
+                <Chip 
+                  icon={<CalendarIcon fontSize="small" />} 
+                  label={t('filters.deadline')} 
+                  size="small" 
+                  variant="outlined"
+                  onClick={() => {}}
+                />
+              </Box>
             </Box>
-          </Paper>
-        </Grid>
+            
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+              {upcomingDeadlines.map((deadline) => (
+                <Paper 
+                  key={deadline.id} 
+                  elevation={3} 
+                  sx={{ 
+                    width: { xs: '100%', sm: 'calc(50% - 16px)', md: 'calc(33.333% - 16px)' },
+                    p: 2,
+                    bgcolor: (theme: any) => theme.palette.mode === 'dark' ? '#555533' : '#fffacd',
+                    color: (theme: any) => theme.palette.mode === 'dark' ? '#ffffff' : 'inherit',
+                    borderRadius: 1,
+                    position: 'relative',
+                    '&::after': {
+                      content: '""',
+                      position: 'absolute',
+                      top: 0,
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      width: '30px',
+                      height: '10px',
+                      bgcolor: '#f5f5f5',
+                      borderBottomLeftRadius: '5px',
+                      borderBottomRightRadius: '5px',
+                      boxShadow: '0 2px 2px rgba(0,0,0,0.1)'
+                    },
+                    transform: 'rotate(1deg)',
+                    transition: 'transform 0.2s',
+                    '&:hover': {
+                      transform: 'rotate(0deg) translateY(-5px)',
+                      zIndex: 1
+                    }
+                  }}
+                >
+                  <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                    {deadline.title}
+                  </Typography>
+                  
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                    <PersonIcon fontSize="small" sx={{ mr: 0.5, fontSize: 16, color: 'text.secondary' }} />
+                    <Typography variant="body2" color="text.secondary">
+                      {getUserNameById(deadline.assignee)}
+                    </Typography>
+                  </Box>
+                  
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Chip 
+                      label={t(`tasks.priorities.${deadline.priority}`)} 
+                      size="small" 
+                      sx={{ 
+                        bgcolor: getPriorityColor(deadline.priority) + '20',
+                        color: getPriorityColor(deadline.priority),
+                        fontSize: '0.7rem',
+                        height: 20
+                      }} 
+                    />
+                    
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <CalendarIcon fontSize="small" sx={{ mr: 0.5, fontSize: 16, color: 'text.secondary' }} />
+                      <Typography variant="body2" color="text.secondary">
+                        {format(new Date(deadline.deadline), 'dd.MM.yyyy')}
+                      </Typography>
+                    </Box>
+                  </Box>
+                </Paper>
+              ))}
+            </Box>
+          </Card>
+        </Box>
 
-        {/* Right Column */}
-        <Grid item xs={12} md={4}>
-          <Card sx={{ mb: 3 }}>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
+        {/* Right Column - Nedávná aktivita и Úkoly podle řešitele */}
+        <Box sx={{ flex: { md: '1 1 30%' }, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'stretch' }}>
+          {/* Nedávná aktivita в виде колонки чата/новостей */}
+          <Card 
+            sx={{ 
+              mb: 3, 
+              borderRadius: 2, 
+              boxShadow: 3, 
+              overflow: 'hidden',
+              height: { xs: '300px', sm: '350px', md: '400px' },
+              display: 'flex',
+              flexDirection: 'column',
+              position: 'sticky',
+              top: { md: '20px' },
+              right: 0,
+              width: '100%'
+            }}
+          >
+            <Box sx={{ 
+              p: 2, 
+              bgcolor: (theme: any) => theme.palette.mode === 'dark' ? 'rgba(30, 30, 30, 0.9)' : '#f8f9fa', 
+              borderBottom: (theme: any) => `1px solid ${theme.palette.divider}`
+            }}>
+              <Typography variant="h6" fontWeight="bold" color="text.primary">
                 {t('dashboard.recentActivity')}
               </Typography>
-              <List>
-                {recentActivity.map((activity, index) => (
-                  <React.Fragment key={activity.id}>
-                    <ListItem key={activity.id} divider>
-                      <ListItemAvatar>
-                        <Avatar sx={{ bgcolor: 'primary.main' }}>
-                          <PersonIcon />
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary={
-                          <Typography variant="body2">
-                            <strong>{activity.task.assignee}</strong> {t(`status.${activity.task.status}`)}: <em>{activity.task.title}</em>
-                          </Typography>
-                        }
-                        secondary={activity.time}
-                      />
-                    </ListItem>
-                  </React.Fragment>
-                ))}
-              </List>
-            </CardContent>
+            </Box>
+            
+            <Box sx={{ 
+              flexGrow: 1, 
+              overflow: 'auto', 
+              bgcolor: (theme: any) => theme.palette.mode === 'dark' ? '#252525' : '#f5f5f5' 
+            }}>
+              {recentActivity.map((activity) => (
+                <Box 
+                  key={activity.id} 
+                  sx={{ 
+                    p: 2, 
+                    m: 2, 
+                    bgcolor: (theme: any) => theme.palette.mode === 'dark' ? '#333333' : 'white', 
+                    borderRadius: 2,
+                    boxShadow: 1,
+                    '&:hover': { boxShadow: 2 }
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                    <Avatar 
+                      sx={{ 
+                        width: 32, 
+                        height: 32, 
+                        mr: 1, 
+                        bgcolor: 'primary.main' 
+                      }}
+                    >
+                      <PersonIcon fontSize="small" />
+                    </Avatar>
+                    <Typography variant="body2" fontWeight="bold">
+                      {getUserNameById(activity.task.assignee)}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto' }}>
+                      {activity.time}
+                    </Typography>
+                  </Box>
+                  
+                  <Typography variant="body2">
+                    {t(`status.${activity.task.status}`)}: <strong>{activity.task.title}</strong>
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
           </Card>
 
-          {/* Team Workload */}
-          <Card>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
+          {/* Úkoly podle řešitele под Nedávná aktivita */}
+          <Card sx={{ 
+            borderRadius: 2, 
+            boxShadow: 3, 
+            overflow: 'hidden',
+            position: { md: 'sticky' },
+            bottom: { md: '20px' },
+            right: 0,
+            width: '100%'
+          }}>
+            <Box sx={{ 
+              p: 2, 
+              bgcolor: (theme: any) => theme.palette.mode === 'dark' ? 'rgba(30, 30, 30, 0.9)' : '#f8f9fa', 
+              borderBottom: (theme: any) => `1px solid ${theme.palette.divider}`
+            }}>
+              <Typography variant="h6" fontWeight="bold" color="text.primary">
                 {t('dashboard.tasksByAssignee')}
               </Typography>
-              <List>
-                {/* Группировка задач по исполнителям */}
-                {Array.from(new Set(tasks.map(task => task.assignee)))
-                  .filter(assignee => assignee) // Фильтруем пустые значения
-                  .slice(0, 5) // Показываем только первых 5 исполнителей
-                  .map((assignee, index) => {
-                    const assigneeTasks = tasks.filter(task => task.assignee === assignee);
-                    const activeTasks = assigneeTasks.filter(task => 
-                      task.status !== 'done' && task.status !== 'cancelled'
-                    ).length;
-                    
-                    // Процент выполнения для визуализации
-                    const completionPercent = Math.min(
-                      100, 
-                      assigneeTasks.length > 0 
-                        ? (assigneeTasks.filter(t => t.status === 'done').length / assigneeTasks.length) * 100 
-                        : 0
-                    );
-                    
-                    return (
-                      <ListItem key={assignee} divider>
-                        <Box sx={{ width: '100%' }}>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                            <Typography variant="body2">
-                              {assignee}
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                              {activeTasks} {t('dashboard.activeTasks')}
-                            </Typography>
-                          </Box>
-                          
-                          {/* Прогресс-бар выполнения задач */}
-                          <Box sx={{ width: '100%', bgcolor: 'background.paper', borderRadius: 1, height: 8, mb: 1 }}>
-                            <Box 
-                              sx={{ 
-                                width: `${completionPercent}%`, 
-                                bgcolor: PRIORITY_COLORS.medium,
-                                height: 8,
-                                borderRadius: 1
-                              }} 
-                            />
-                          </Box>
-                        </Box>
-                      </ListItem>
-                    );
-                  })
-                }
-              </List>
-            </CardContent>
+            </Box>
+            
+            <Box sx={{ p: 2 }}>
+              {Array.from(new Set(tasks.map(task => task.assignee)))
+                .filter(assignee => assignee)
+                .slice(0, 5)
+                .map((assignee) => {
+                  const assigneeTasks = tasks.filter(task => task.assignee === assignee);
+                  const activeTasks = assigneeTasks.filter(task => 
+                    task.status !== 'done' && task.status !== 'cancelled'
+                  ).length;
+                  
+                  const completionPercent = Math.min(
+                    100, 
+                    assigneeTasks.length > 0 
+                      ? (assigneeTasks.filter(t => t.status === 'done').length / assigneeTasks.length) * 100 
+                      : 0
+                  );
+                  
+                  return (
+                    <Box key={assignee} sx={{ mb: 2, '&:last-child': { mb: 0 } }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                        <Typography variant="body2" fontWeight="medium">
+                          {getUserNameById(assignee)}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {activeTasks} {t('dashboard.activeTasks')}
+                        </Typography>
+                      </Box>
+                      
+                      <Box sx={{ width: '100%', bgcolor: 'background.paper', borderRadius: 1, height: 8, mb: 1 }}>
+                        <Box 
+                          sx={{ 
+                            width: `${completionPercent}%`, 
+                            bgcolor: PRIORITY_COLORS.medium,
+                            height: 8,
+                            borderRadius: 1
+                          }} 
+                        />
+                      </Box>
+                    </Box>
+                  );
+                })
+              }
+            </Box>
           </Card>
-        </Grid>
-      </Grid>
+        </Box>
+      </Box>
+      
+      {/* Úkoly podle statusu в виде тонкой полоски внизу экрана */}
+      <Paper 
+        sx={{ 
+          mt: 4, 
+          p: 2, 
+          borderRadius: 2, 
+          boxShadow: 2, 
+          bgcolor: (theme: any) => theme.palette.mode === 'dark' ? 'rgba(30, 30, 30, 0.9)' : '#f8f9fa'
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+          <Typography variant="subtitle1" fontWeight="bold" color="text.primary" sx={{ mr: 2 }}>
+            {t('dashboard.tasksByStatus')}
+          </Typography>
+          
+          <Box sx={{ display: 'flex', flexGrow: 1, height: 30, borderRadius: 1, overflow: 'hidden' }}>
+            {[
+              { status: 'new' as TaskStatus, label: t('tasks.statuses.new') },
+              { status: 'inProgress' as TaskStatus, label: t('tasks.statuses.inProgress') },
+              { status: 'review' as TaskStatus, label: t('tasks.statuses.review') },
+              { status: 'done' as TaskStatus, label: t('tasks.statuses.done') },
+              { status: 'cancelled' as TaskStatus, label: t('tasks.statuses.cancelled') }
+            ].map(statusItem => {
+              const count = tasks.filter(task => task.status === statusItem.status).length;
+              const totalTasks = tasks.length || 1; // Избегаем деления на ноль
+              const widthPercent = (count / totalTasks) * 100;
+              
+              return (
+                <Box 
+                  key={statusItem.status} 
+                  sx={{ 
+                    width: `${widthPercent}%`, 
+                    bgcolor: STATUS_COLORS[statusItem.status],
+                    height: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minWidth: count > 0 ? '40px' : '0px'
+                  }}
+                >
+                  {count > 0 && (
+                    <Typography variant="caption" sx={{ color: 'white', fontWeight: 'bold' }}>
+                      {count}
+                    </Typography>
+                  )}
+                </Box>
+              );
+            })}
+          </Box>
+        </Box>
+        
+        <Box sx={{ display: 'flex', justifyContent: 'center', gap: 3, mt: 1 }}>
+          {[
+            { status: 'new' as TaskStatus, label: t('tasks.statuses.new') },
+            { status: 'inProgress' as TaskStatus, label: t('tasks.statuses.inProgress') },
+            { status: 'review' as TaskStatus, label: t('tasks.statuses.review') },
+            { status: 'done' as TaskStatus, label: t('tasks.statuses.done') },
+            { status: 'cancelled' as TaskStatus, label: t('tasks.statuses.cancelled') }
+          ].map(statusItem => (
+            <Box key={statusItem.status} sx={{ display: 'flex', alignItems: 'center' }}>
+              <Box 
+                sx={{ 
+                  width: 12, 
+                  height: 12, 
+                  borderRadius: '50%', 
+                  bgcolor: STATUS_COLORS[statusItem.status],
+                  mr: 0.5 
+                }} 
+              />
+              <Typography variant="caption">{statusItem.label}</Typography>
+            </Box>
+          ))}
+        </Box>
+      </Paper>
     </Box>
   );
 };
