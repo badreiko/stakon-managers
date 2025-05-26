@@ -9,8 +9,27 @@ import {
   Paper, 
   Chip 
 } from '@mui/material';
-import { format } from 'date-fns';
+import { format, isValid } from 'date-fns';
 import { Project } from '../../types/project.types';
+
+// Безопасная функция форматирования даты
+const safeFormatDate = (date: string | Date | null | undefined, formatStr: string = 'dd.MM.yyyy'): string => {
+  if (!date) return '-';
+  
+  try {
+    const dateObj = date instanceof Date ? date : new Date(date);
+    
+    if (isNaN(dateObj.getTime()) || !isValid(dateObj)) {
+      console.warn('Invalid date value:', date);
+      return '-';
+    }
+    
+    return format(dateObj, formatStr);
+  } catch (error) {
+    console.error('Error formatting date:', error, date);
+    return '-';
+  }
+};
 
 const ProjectsTable: React.FC<{ projects: Project[] }> = ({ projects }) => {
   // Сортируем проекты по статусу (сначала активные) и дате создания
@@ -63,10 +82,10 @@ const ProjectsTable: React.FC<{ projects: Project[] }> = ({ projects }) => {
                 />
               </TableCell>
               <TableCell>
-                {project.startDate ? format(new Date(project.startDate), 'dd.MM.yyyy') : '-'}
+                {safeFormatDate(project.startDate)}
               </TableCell>
               <TableCell>
-                {project.deadline ? format(new Date(project.deadline), 'dd.MM.yyyy') : '-'}
+                {safeFormatDate(project.deadline)}
               </TableCell>
               <TableCell>{project.statistics?.totalTasks || 0}</TableCell>
             </TableRow>
